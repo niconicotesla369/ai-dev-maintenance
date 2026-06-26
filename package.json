@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Safely diagnose and reclaim local disk usage from AI coding tool state.",
   "type": "module",
-  "packageManager": "pnpm@11.9.0",
+  "packageManager": "pnpm@10.34.4",
   "bin": {
     "ai-dev-maintenance": "./dist/cli.js"
   },

@@ -26,7 +26,9 @@ jobs:
       - run: corepack pnpm run release:check:prepublic
       - run: corepack pnpm pack --dry-run
       - run: |
-          TARBALL="$(corepack pnpm pack --json | node -e 'let data=\"\"; process.stdin.on(\"data\", c => data += c); process.stdin.on(\"end\", () => console.log(JSON.parse(data)[0].filename));')"
+          PACK_JSON="$(mktemp)"
+          npm pack --json --ignore-scripts > "$PACK_JSON"
+          TARBALL="$(PACK_JSON="$PACK_JSON" node -e 'const { readFileSync } = require("node:fs"); const data = JSON.parse(readFileSync(process.env.PACK_JSON, "utf8")); console.log(data[0].filename);')"
           TMP="$(mktemp -d)"
           cd "$TMP"
           npm init -y

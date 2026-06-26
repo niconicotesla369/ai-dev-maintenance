@@ -7,6 +7,7 @@ describe('release readiness', () => {
   test('package prepack forces verification and build before publishing', async () => {
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 
+    expect(pkg.packageManager).toMatch(/^pnpm@10\./);
     expect(pkg.scripts.prepack).toContain('pnpm run verify');
     expect(pkg.scripts.prepack).toContain('pnpm run build');
     expect(pkg.scripts.prepack).toContain('pnpm run hygiene:package');
@@ -41,6 +42,16 @@ describe('release readiness', () => {
     expect(workflow.indexOf('corepack enable')).toBeLessThan(
       workflow.indexOf('corepack pnpm install --frozen-lockfile --ignore-scripts')
     );
+  });
+
+  test('ci tarball smoke reads pack json from a file instead of a fragile pipe', async () => {
+    const workflow = await readFile('.github/workflows/ci.yml', 'utf8');
+
+    expect(workflow).toContain('PACK_JSON="$(mktemp)"');
+    expect(workflow).toContain('npm pack --json --ignore-scripts > "$PACK_JSON"');
+    expect(workflow).toContain("readFileSync(process.env.PACK_JSON");
+    expect(workflow).not.toContain('corepack pnpm pack --json | node -e');
+    expect(workflow).not.toContain('corepack pnpm pack --json > "$PACK_JSON"');
   });
 
   test('prepublish runs the full fresh verification and packaging gate', async () => {

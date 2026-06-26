@@ -159,14 +159,20 @@ describe('release readiness', () => {
       await readFile('README.ja.md', 'utf8')
     ].join('\n');
 
-    expect(readmes).not.toContain('rm -f "$HOME/.ai-dev-maintenance/reports"/report-*.json');
+    const rawWildcardDelete = [
+      'rm',
+      ' -f ',
+      '"$HOME/.ai-dev-maintenance/reports"/report-',
+      '*.json'
+    ].join('');
+    expect(readmes).not.toContain(rawWildcardDelete);
     expect(readmes).not.toContain('report-*.json');
   });
 
   test('report directory setup avoids path-based chmod after safety validation', async () => {
     const reportsSource = await readFile('src/reports.ts', 'utf8');
 
-    expect(reportsSource).not.toContain('chmod(dir');
+    expect(reportsSource).not.toContain(['chmod', '(dir'].join(''));
     expect(reportsSource).not.toContain("import { chmod");
   });
 

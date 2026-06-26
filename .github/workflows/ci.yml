@@ -19,7 +19,6 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ matrix.node-version }}
-          cache: pnpm
       - run: corepack enable
       - run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - run: corepack pnpm run verify
@@ -44,7 +43,6 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ matrix.node-version }}
-          cache: pnpm
       - run: corepack enable
       - run: corepack pnpm install --frozen-lockfile --ignore-scripts
       - run: corepack pnpm run test

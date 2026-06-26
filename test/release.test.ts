@@ -33,6 +33,16 @@ describe('release readiness', () => {
     expect(workflow).toContain('npm install --ignore-scripts');
   });
 
+  test('ci bootstraps pnpm with corepack instead of setup-node pnpm cache', async () => {
+    const workflow = await readFile('.github/workflows/ci.yml', 'utf8');
+
+    expect(workflow).not.toContain('cache: pnpm');
+    expect(workflow).toContain('corepack enable');
+    expect(workflow.indexOf('corepack enable')).toBeLessThan(
+      workflow.indexOf('corepack pnpm install --frozen-lockfile --ignore-scripts')
+    );
+  });
+
   test('prepublish runs the full fresh verification and packaging gate', async () => {
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 

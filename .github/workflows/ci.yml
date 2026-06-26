@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - run: corepack pnpm run verify
+      - run: corepack pnpm run build
+      - run: corepack pnpm run release:check:prepublic
+      - run: corepack pnpm pack --dry-run
+      - run: |
+          TARBALL="$(corepack pnpm pack --json | node -e 'let data=\"\"; process.stdin.on(\"data\", c => data += c); process.stdin.on(\"end\", () => console.log(JSON.parse(data)[0].filename));')"
+          TMP="$(mktemp -d)"
+          cd "$TMP"
+          npm init -y
+          npm install --ignore-scripts --no-audit --fund=false "$GITHUB_WORKSPACE/$TARBALL"
+          ./node_modules/.bin/ai-dev-maintenance doctor --json
+
+  unsupported-platform-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20, 22]
+    steps:
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+      - run: corepack enable
+      - run: corepack pnpm install --frozen-lockfile --ignore-scripts
+      - run: corepack pnpm run test

@@ -1,0 +1,55 @@
+{
+  "name": "ai-dev-maintenance",
+  "version": "0.1.0",
+  "description": "Safely diagnose and reclaim local disk usage from AI coding tool state.",
+  "type": "module",
+  "packageManager": "pnpm@11.9.0",
+  "bin": {
+    "ai-dev-maintenance": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.ja.md",
+    "SECURITY.md",
+    "LICENSE",
+    "examples"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "hygiene": "node scripts/public-hygiene.mjs",
+    "hygiene:package": "node scripts/public-hygiene.mjs --package",
+    "verify": "pnpm run typecheck && pnpm run test && pnpm run hygiene",
+    "release:check": "node scripts/release-check.mjs",
+    "release:check:prepublic": "node scripts/release-check.mjs --allow-missing-metadata",
+    "prepack": "pnpm run verify && pnpm run build && pnpm run hygiene:package",
+    "prepublishOnly": "pnpm run verify && pnpm run build && pnpm run hygiene:package && pnpm run release:check"
+  },
+  "keywords": [
+    "codex",
+    "sqlite",
+    "wal",
+    "macos",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/niconicotesla369/ai-dev-maintenance.git"
+  },
+  "bugs": {
+    "url": "https://github.com/niconicotesla369/ai-dev-maintenance/issues"
+  },
+  "homepage": "https://github.com/niconicotesla369/ai-dev-maintenance#readme",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

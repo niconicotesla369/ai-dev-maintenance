@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.1.0",
+  "generatedAt": "2026-06-25T00:00:00.000Z",
+  "command": "fix --safe",
+  "status": "ok",
+  "redacted": true,
+  "target": {
+    "kind": "default-codex-log-db",
+    "pathCategory": "<home>/.codex/logs_2.sqlite"
+  },
+  "findings": {
+    "sqliteJson": {
+      "ok": true
+    },
+    "openHandles": {
+      "usable": true,
+      "openHandles": false,
+      "reason": "no open handles reported"
+    }
+  },
+  "metrics": {
+    "beforeWalBytes": 52428800,
+    "afterWalBytes": 0,
+    "reclaimedBytes": 52428800,
+    "mainDbForcedShrink": false
+  },
+  "blockedReasons": [],
+  "nextSafeAction": "Review the before/after metrics in the saved report."
+}

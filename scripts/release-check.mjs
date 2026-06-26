@@ -81,8 +81,8 @@ export function assertNoInstallLifecycleScripts(packageJson) {
 
 function assertPackageInvariants(packageJson) {
   if (packageJson.name !== 'ai-dev-maintenance') failures.push('package name must be ai-dev-maintenance');
-  if (packageJson.bin?.['ai-dev-maintenance'] !== './dist/cli.js') {
-    failures.push('bin.ai-dev-maintenance must point to ./dist/cli.js');
+  if (packageJson.bin?.['ai-dev-maintenance'] !== 'dist/cli.js') {
+    failures.push('bin.ai-dev-maintenance must point to dist/cli.js');
   }
   if (Object.keys(packageJson.dependencies ?? {}).length > 0) {
     failures.push('runtime dependencies are not allowed in v1');

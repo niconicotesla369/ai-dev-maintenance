@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.34.4",
   "bin": {
-    "ai-dev-maintenance": "./dist/cli.js"
+    "ai-dev-maintenance": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -27,8 +27,8 @@
     "verify": "pnpm run typecheck && pnpm run test && pnpm run hygiene",
     "release:check": "node scripts/release-check.mjs",
     "release:check:prepublic": "node scripts/release-check.mjs --allow-missing-metadata",
-    "prepack": "pnpm run verify && pnpm run build && pnpm run hygiene:package",
-    "prepublishOnly": "pnpm run verify && pnpm run build && pnpm run hygiene:package && pnpm run release:check"
+    "prepack": "corepack pnpm run verify && corepack pnpm run build && corepack pnpm run hygiene:package",
+    "prepublishOnly": "corepack pnpm run verify && corepack pnpm run build && corepack pnpm run hygiene:package && corepack pnpm run release:check"
   },
   "keywords": [
     "codex",

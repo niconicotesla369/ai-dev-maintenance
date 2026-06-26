@@ -21,6 +21,8 @@ describe('release readiness', () => {
     const releaseCheck = await readFile('scripts/release-check.mjs', 'utf8');
     const workflow = await readFile('.github/workflows/ci.yml', 'utf8');
 
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    expect(pkg.bin?.['ai-dev-maintenance']).toBe('dist/cli.js');
     expect(releaseCheck).toContain('npm pack --json');
     expect(releaseCheck).toContain('assertNoInstallLifecycleScripts');
     expect(releaseCheck).toContain('assertVersionSync');
@@ -57,6 +59,8 @@ describe('release readiness', () => {
   test('prepublish runs the full fresh verification and packaging gate', async () => {
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 
+    expect(pkg.scripts.prepack).toContain('corepack pnpm run verify');
+    expect(pkg.scripts.prepublishOnly).toContain('corepack pnpm run verify');
     expect(pkg.scripts.prepublishOnly).toContain('pnpm run verify');
     expect(pkg.scripts.prepublishOnly).toContain('pnpm run build');
     expect(pkg.scripts.prepublishOnly).toContain('pnpm run hygiene:package');

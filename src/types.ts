@@ -35,6 +35,11 @@ export type FixSafetyPlan = {
   reasons: string[];
 };
 
+export type FixReadiness = {
+  safe: boolean;
+  reasons: string[];
+};
+
 export type FileIdentity = {
   pathCategory: string;
   realpath?: string;

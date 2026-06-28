@@ -8,22 +8,34 @@ The first release is intentionally small. It focuses on macOS, redacted reports,
 
 ## Install-Free Usage
 
+Quick diagnosis:
+
+```bash
+npx --yes ai-dev-maintenance@0.1.1
+```
+
+Pinned safety-first diagnosis:
+
+```bash
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+```
+
 1. Diagnose only:
 
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -32,10 +44,12 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 
 Start with `doctor`. It writes a redacted local report under `<home>/.ai-dev-maintenance/reports`. Review that report before running `fix --safe --yes`.
 
+If AI coding tools are still open, `doctor` can complete but `fix --safe --yes` will be marked blocked. Close those tools first, then run `doctor` again.
+
 ## Commands
 
 ```bash
-ai-dev-maintenance doctor [--json] [--show-paths]
+ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 ```
@@ -85,10 +99,11 @@ Redacted reports keep high-level target categories, existence flags, file sizes,
 
 Human-readable output includes:
 
-- whether it is safe to run `fix --safe`;
+- whether `fix --safe` is ready or blocked;
+- the reason it is blocked, if any;
+- main database and WAL sizes in MiB;
 - what changed in the current command;
-- where the redacted report was saved;
-- the command to review the latest report.
+- the next command to run.
 
 ## Emergency / Advanced Only
 

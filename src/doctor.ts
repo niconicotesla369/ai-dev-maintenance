@@ -3,7 +3,7 @@ import { trustedCommandPath, runCommand } from './commands.js';
 import { detectTargetState, safeTargetStateForReport } from './fs-safety.js';
 import { defaultCodexHome, redactPath, targetTriple } from './paths.js';
 import { writeReport } from './reports.js';
-import { classifyLsofResult, parseKnownCodexProcess } from './safety.js';
+import { classifyLsofResult, deriveFixReadiness, parseKnownCodexProcess } from './safety.js';
 import { checkSqliteJsonSupport } from './sqlite.js';
 import type { MaintenanceReport } from './types.js';
 import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from './version.js';
@@ -40,6 +40,7 @@ export async function runDoctor(options: {
 
   const knownProcess = await knownCodexProcessExists();
   report.findings.knownCodexProcessExists = knownProcess;
+  report.findings.fixReadiness = deriveFixReadiness(report);
 
   report.findings.sqlite = {
     available: false,

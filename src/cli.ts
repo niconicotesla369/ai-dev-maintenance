@@ -5,6 +5,8 @@ import { runFixSafe } from './fix.js';
 import { redactPath } from './paths.js';
 import { latestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup } from './restore.js';
+import { deriveFixReadiness } from './safety.js';
+import type { MaintenanceReport } from './types.js';
 import { TOOL_VERSION } from './version.js';
 
 type CliResult = {
@@ -16,15 +18,23 @@ export async function runCli(argv = process.argv.slice(2)): Promise<CliResult> {
   const [command = 'doctor', ...args] = argv;
   const json = args.includes('--json');
   const showPaths = args.includes('--show-paths');
+  const noBanner = args.includes('--no-banner');
 
   if (command === 'doctor') {
-    const flagError = unknownFlagError(args, new Set(['--json', '--show-paths']), 'doctor');
+    const flagError = unknownFlagError(args, new Set(['--json', '--show-paths', '--no-banner']), 'doctor');
     if (flagError) return { exitCode: 2, output: flagError };
     const { report, reportPath } = await runDoctor({ json, showPaths });
     const outputReport = sanitizeReportForOutput(report);
+    const banner = shouldShowBanner({
+      json,
+      noBanner,
+      ci: process.env.CI !== undefined,
+      noColor: process.env.NO_COLOR !== undefined,
+      isTty: process.stdout.isTTY === true
+    });
     return {
       exitCode: report.status === 'unsupported' ? 2 : 0,
-      output: json ? `${JSON.stringify(outputReport, null, 2)}\n` : renderReport(outputReport, reportPath, showPaths)
+      output: json ? `${JSON.stringify(outputReport, null, 2)}\n` : renderReport(outputReport, reportPath, showPaths, { banner })
     };
   }
 
@@ -66,27 +76,49 @@ export async function runCli(argv = process.argv.slice(2)): Promise<CliResult> {
   };
 }
 
-function renderReport(report: Awaited<ReturnType<typeof runDoctor>>['report'], reportPath?: string, showPaths = false): string {
-  const lines = [
-    `Status: ${report.status}`,
-    `Safe to run fix --safe --yes: ${safeToRunFix(report) ? 'yes' : 'no'}`,
-    `What changed: ${whatChanged(report)}`,
-    `Target: ${report.target.pathCategory}`,
-    `Blocked reasons: ${report.blockedReasons.length === 0 ? 'none' : report.blockedReasons.join('; ')}`
-  ];
-  if (report.metrics.reclaimedBytes !== undefined) {
-    lines.push(`Reclaimed bytes: ${report.metrics.reclaimedBytes}`);
+type RenderReportOptions = {
+  banner?: boolean;
+};
+
+type BannerOptions = {
+  json: boolean;
+  noBanner: boolean;
+  ci: boolean;
+  noColor: boolean;
+  isTty: boolean;
+};
+
+function renderReport(report: MaintenanceReport, reportPath?: string, showPaths = false, options: RenderReportOptions = {}): string {
+  const readiness = report.command === 'doctor' ? deriveFixReadiness(report) : undefined;
+  const lines: string[] = [];
+  if (options.banner) {
+    lines.push('AI DEV MAINTENANCE', 'Codex log doctor', '');
   }
-  if (report.nextSafeAction) lines.push(`Next safe action: ${report.nextSafeAction}`);
+  lines.push(row('Diagnosis', diagnosisLabel(report)));
+  if (readiness) {
+    lines.push(row('Fix readiness', readiness.safe ? 'ready' : 'blocked'));
+    if (!readiness.safe) lines.push(row('Reason', readiness.reasons.join('; ') || 'not safe to run fix'));
+  } else if (report.blockedReasons.length > 0) {
+    lines.push(row('Reason', report.blockedReasons.join('; ')));
+  }
+  lines.push(row('Target', report.target.pathCategory));
+  lines.push(...targetSizeRows(report));
+  lines.push(...metricRows(report));
+  lines.push(row('Changed', whatChanged(report)));
   if (reportPath) {
     const reportLocation = showPaths ? redactPath(reportPath) : redactPath(reportPath);
-    lines.push(`Report saved: ${reportLocation}`);
-    lines.push(`Review with: npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest`);
+    lines.push(row('Report', reportLocation));
+    lines.push(row('Review', `npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest`));
   }
+  const next = nextAction(report, readiness?.safe === true);
+  if (next) lines.push(row('Next', next));
   return `${lines.join('\n')}\n`;
 }
 
 export { renderReport };
+export function shouldShowBanner(options: BannerOptions): boolean {
+  return !options.json && !options.noBanner && !options.ci && !options.noColor && options.isTty;
+}
 
 export function fixSafeConfirmationError(args: string[]): string | undefined {
   const allowed = new Set(['--safe', '--yes']);
@@ -110,24 +142,14 @@ function unknownFlagError(args: string[], allowed: Set<string>, command: string)
 function usageText(): string {
   return [
     'Usage:',
-    '  ai-dev-maintenance doctor [--json] [--show-paths]',
+    '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
     '  ai-dev-maintenance fix --safe --yes',
     '  ai-dev-maintenance report --latest [--show-paths]',
     '  ai-dev-maintenance restore validate --backup <path>'
   ].join('\n') + '\n';
 }
 
-function safeToRunFix(report: Awaited<ReturnType<typeof runDoctor>>['report']): boolean {
-  if (report.command !== 'doctor') return false;
-  if (report.status !== 'ok' || report.blockedReasons.length > 0) return false;
-  const findings = report.findings as Record<string, unknown>;
-  const openHandles = findings.openHandles as { usable?: boolean; openHandles?: boolean } | undefined;
-  if (openHandles && (!openHandles.usable || openHandles.openHandles)) return false;
-  if (findings.knownCodexProcessExists !== false) return false;
-  return true;
-}
-
-function whatChanged(report: Awaited<ReturnType<typeof runDoctor>>['report']): string {
+function whatChanged(report: MaintenanceReport): string {
   if (report.command === 'doctor') return 'redacted report only';
   if (report.command === 'fix --safe' && report.status === 'ok') return 'private backup + WAL cleanup';
   if (report.command === 'fix --safe' && report.metrics.backupCreated && report.metrics.checkpointAttempted) {
@@ -136,6 +158,59 @@ function whatChanged(report: Awaited<ReturnType<typeof runDoctor>>['report']): s
   if (report.command === 'fix --safe' && report.metrics.backupCreated) return 'private backup created; fix was blocked';
   if (report.command === 'fix --safe') return 'nothing; fix was blocked';
   return 'nothing';
+}
+
+function row(label: string, value: string): string {
+  return `${label.padEnd(16, ' ')}${value}`;
+}
+
+function diagnosisLabel(report: MaintenanceReport): string {
+  if (report.command === 'doctor' && report.status === 'ok') return 'complete';
+  return report.status;
+}
+
+function targetSizeRows(report: MaintenanceReport): string[] {
+  const targetState = (report.findings as Record<string, unknown>).targetState as Record<string, unknown> | undefined;
+  return [
+    sizeRow('Main DB', targetState?.main),
+    sizeRow('WAL', targetState?.wal),
+    sizeRow('SHM', targetState?.shm)
+  ].filter((line): line is string => Boolean(line));
+}
+
+function sizeRow(label: string, value: unknown): string | undefined {
+  if (!isRecord(value)) return undefined;
+  const size = value.size;
+  if (typeof size !== 'number' || !Number.isFinite(size)) return undefined;
+  return row(label, formatMiB(size));
+}
+
+function metricRows(report: MaintenanceReport): string[] {
+  const rows: string[] = [];
+  for (const [key, label] of [
+    ['beforeWalBytes', 'Before WAL'],
+    ['afterWalBytes', 'After WAL'],
+    ['reclaimedBytes', 'Reclaimed']
+  ] as const) {
+    const value = report.metrics[key];
+    if (typeof value === 'number' && Number.isFinite(value)) rows.push(row(label, formatMiB(value)));
+  }
+  return rows;
+}
+
+function formatMiB(bytes: number): string {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+function nextAction(report: MaintenanceReport, ready: boolean): string | undefined {
+  if (report.nextSafeAction) return report.nextSafeAction;
+  if (report.command !== 'doctor') return undefined;
+  if (ready) return `npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- fix --safe --yes`;
+  return 'Close AI coding tools, then run doctor again.';
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 export function isDirectCliInvocation(moduleUrl: string, argv1: string | undefined): boolean {

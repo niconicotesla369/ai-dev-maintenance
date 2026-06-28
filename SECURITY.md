@@ -14,4 +14,4 @@ We aim to acknowledge actionable vulnerability reports within 7 days.
 
 ## Data Handling
 
-The CLI is designed to operate locally. It does not upload diagnostic data. Reports are redacted by default. v1 has no unredacted report output mode.
+The CLI is designed to operate locally. It does not upload diagnostic data. Reports are redacted by default. v0.1.x has no unredacted report output mode.

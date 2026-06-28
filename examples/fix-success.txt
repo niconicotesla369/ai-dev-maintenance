@@ -1,0 +1,9 @@
+Diagnosis       ok
+Target          <home>/.codex/logs_2.sqlite
+Before WAL      5.0 MiB
+After WAL       0.0 MiB
+Reclaimed       5.0 MiB
+Changed         private backup + WAL cleanup
+Report          <home>/.ai-dev-maintenance/reports/report-2026-06-28T00-00-00-000Z.json
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.3 -- report --latest
+Next            Review the before/after metrics in the saved report.

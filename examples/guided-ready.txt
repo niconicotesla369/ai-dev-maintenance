@@ -1,0 +1,17 @@
+AI DEV MAINTENANCE
+Codex log doctor
+
+Checking whether Codex cleanup is safe...
+AIDM will not delete chats, rewrite history, or touch Codex while it is open.
+
+Status          Ready to clean
+Target          <home>/.codex/logs_2.sqlite
+Main DB         46.7 MiB
+WAL             5.2 MiB
+SHM             0.0 MiB
+
+Codex is closed and no open database handles were found.
+AIDM will create a private backup first, then run SQLite WAL checkpoint/truncate.
+If any safety check changes, it will stop without modifying the database.
+
+Clean now? [y/N]

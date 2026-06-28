@@ -2,69 +2,79 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断・回収するためのCLIです。
 
-v1はmacOS専用です。CodexのSQLiteログDBに対するWAL回収を中心に、セッション履歴を触らないことを最優先にしています。
+v0.1.xはmacOS専用です。CodexのSQLiteログDBに対するWAL回収を中心に、セッション履歴を触らないことを最優先にしています。
 
 `doctor` は、ローカルに伏せ字済みの診断レポートを書くだけです。`fix --safe --yes` は、Codexログデータを含む可能性がある非公開のローカルバックアップを作成してから、SQLiteのWAL領域を整理します。ログ本文の表示、アップロード、ログ削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
 
 ## 使い方
 
-まず診断だけ実行:
+まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.1.2
+npx --yes ai-dev-maintenance@0.1.3
 ```
+
+通常のターミナルでは対話式に起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
 
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- doctor --show-paths
 ```
 
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.1.2
+npm install -g ai-dev-maintenance@0.1.3
 aidm
 ```
+
+CodexなどのAIコーディングツールを開いたままでも診断はできます。ただしcleanupは安全のためpausedになります。利用者が自分でCodexを閉じてから、waitを選ぶと再確認できます。このツールがCodexを強制終了、kill、restart、変更することはありません。
+
+手動コマンドも使えます。
 
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
 
-最初は `doctor` だけを実行してください。`doctor` は `<home>/.ai-dev-maintenance/reports` に伏せ字済みレポートを書き込みます。レポート確認後に `fix --safe --yes` を実行します。
+最初はガイド付きコマンドか `doctor` を実行してください。`doctor` は `<home>/.ai-dev-maintenance/reports` に伏せ字済みレポートを書き込みます。レポート確認後に `fix --safe --yes` を実行します。
 
 CodexなどのAIコーディングツールが開いたままの状態では、`doctor` は完了しても `fix --safe --yes` はblockedになります。対象ツールを閉じてから、もう一度 `doctor` を実行してください。
 
 ## コマンド
 
 ```bash
+ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive]
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
+aidm [--wait] [--wait-timeout <minutes>] [--no-interactive]
 aidm doctor [--json] [--show-paths] [--no-banner]
 ```
+
+TTYでも従来の静的表示にしたい場合は `--no-interactive` を使います。script用途では `doctor --json` を使ってください。
 
 ## 安全方針
 
 - `doctor` は原本DBをSQLite接続として開きません。
 - `doctor` はツール用データディレクトリに伏せ字済みローカルレポートを書き込みます。
-- v1の `doctor` はprivate log DB bytesを複製しないため、SQLite本文検査をスキップします。
+- v0.1.xの `doctor` はprivate log DB bytesを複製しないため、SQLite本文検査をスキップします。
 - `fix --safe --yes` はデフォルトのCodex `logs_2.sqlite` とSQLite補助ファイルだけを対象にします。
 - Codex processが動いている場合、対象DBを開いているprocessがある場合、open-handle確認ができない場合はblockします。
 - SQLite起動には `file:` URI modeを使い、plain database pathを使いません。
@@ -89,6 +99,8 @@ aidm doctor [--json] [--show-paths] [--no-banner]
 - backup自動復元
 
 伏せ字済みレポートには、対象カテゴリ、存在有無、ファイルサイズ、コマンド状態、回収量などの高レベル情報だけを残します。ローカルマシン固有の識別子、コマンドの生出力、絶対パスは保存・表示しません。`--show-paths` でも伏せ字済みパスだけを表示します。
+
+出力例は `examples/doctor-blocked.txt`、`examples/guided-paused.txt`、`examples/guided-ready.txt`、`examples/fix-success.txt` にあります。
 
 ## 緊急時 / 上級者向け
 
@@ -115,4 +127,4 @@ runtime dependencyとinstall-time package lifecycle scriptはありません。
 伏せ字済み診断レポートは `<home>/.ai-dev-maintenance/reports` に保存されます。
 このレポートは小さく、Codexのセッション、他AIツールのセッション、バックアップは含みません。
 
-v1では手動ワイルドカード削除の手順を公開しません。将来cleanupコマンドを追加する場合は、削除前にapp data directoryの安全性を検証し、ツール所有のレポートファイルだけを対象にします。
+v0.1.xでは手動ワイルドカード削除の手順を公開しません。将来cleanupコマンドを追加する場合は、削除前にapp data directoryの安全性を検証し、ツール所有のレポートファイルだけを対象にします。

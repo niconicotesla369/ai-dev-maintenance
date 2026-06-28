@@ -1,0 +1,23 @@
+AI DEV MAINTENANCE
+Codex log doctor
+
+Checking whether Codex cleanup is safe...
+AIDM will not delete chats, rewrite history, or touch Codex while it is open.
+
+Status          Paused for safety
+Reason          target database is open by a process; known Codex process is running
+Target          <home>/.codex/logs_2.sqlite
+Main DB         46.7 MiB
+WAL             5.2 MiB
+SHM             0.0 MiB
+
+Codex is still open, so AIDM will not clean anything yet.
+Nothing was changed except a redacted local report.
+WAL is SQLite temporary log storage; SHM is SQLite sidecar metadata.
+
+What do you want to do?
+1. Wait
+2. Re-check
+3. Show report command
+4. Quit
+Choose [1-4]:

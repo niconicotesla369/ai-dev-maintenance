@@ -11,31 +11,38 @@ v1はmacOS専用です。CodexのSQLiteログDBに対するWAL回収を中心に
 まず診断だけ実行:
 
 ```bash
-npx --yes ai-dev-maintenance@0.1.1
+npx --yes ai-dev-maintenance@0.1.2
 ```
 
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
+```
+
+短いコマンドで起動したい場合:
+
+```bash
+npm install -g ai-dev-maintenance@0.1.2
+aidm
 ```
 
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -50,6 +57,7 @@ CodexなどのAIコーディングツールが開いたままの状態では、`
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
+aidm doctor [--json] [--show-paths] [--no-banner]
 ```
 
 ## 安全方針

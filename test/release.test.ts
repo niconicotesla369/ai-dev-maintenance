@@ -23,11 +23,13 @@ describe('release readiness', () => {
 
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
     expect(pkg.bin?.['ai-dev-maintenance']).toBe('dist/cli.js');
+    expect(pkg.bin?.aidm).toBe('dist/cli.js');
     expect(releaseCheck).toContain('npm pack --json');
     expect(releaseCheck).toContain('assertNoInstallLifecycleScripts');
     expect(releaseCheck).toContain('assertVersionSync');
     expect(releaseCheck).toContain('assertDistSafetyMarkers');
     expect(releaseCheck).toContain('ai-dev-maintenance');
+    expect(releaseCheck).toContain('bin.aidm must point to dist/cli.js');
     expect(releaseCheck).toContain('listSourceFiles');
     expect(releaseCheck).toContain('node:net');
     expect(releaseCheck).toContain('node:dns');
@@ -83,7 +85,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.1',
+      toolVersion: '0.1.2',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -108,7 +110,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.2 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -120,7 +122,7 @@ describe('release readiness', () => {
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.1',
+      toolVersion: '0.1.2',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -151,6 +153,8 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.1.2');
+    expect(readme).toContain('aidm');
   });
 
   test('public readmes do not publish raw wildcard deletion cleanup commands', async () => {

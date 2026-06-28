@@ -1,11 +1,12 @@
 {
   "name": "ai-dev-maintenance",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Safely diagnose and reclaim local disk usage from AI coding tool state.",
   "type": "module",
   "packageManager": "pnpm@10.34.4",
   "bin": {
-    "ai-dev-maintenance": "dist/cli.js"
+    "ai-dev-maintenance": "dist/cli.js",
+    "aidm": "dist/cli.js"
   },
   "files": [
     "dist",

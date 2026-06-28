@@ -8,30 +8,46 @@ v1はmacOS専用です。CodexのSQLiteログDBに対するWAL回収を中心に
 
 ## 使い方
 
+まず診断だけ実行:
+
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- doctor --show-paths
+npx --yes ai-dev-maintenance@0.1.1
+```
+
+安全重視の固定版:
+
+```bash
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+```
+
+1. 診断だけ実行:
+
+```bash
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
 
 最初は `doctor` だけを実行してください。`doctor` は `<home>/.ai-dev-maintenance/reports` に伏せ字済みレポートを書き込みます。レポート確認後に `fix --safe --yes` を実行します。
 
+CodexなどのAIコーディングツールが開いたままの状態では、`doctor` は完了しても `fix --safe --yes` はblockedになります。対象ツールを閉じてから、もう一度 `doctor` を実行してください。
+
 ## コマンド
 
 ```bash
-ai-dev-maintenance doctor [--json] [--show-paths]
+ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 ```

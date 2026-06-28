@@ -1,8 +1,10 @@
 import type {
   CommandRunResult,
+  FixReadiness,
   FixSafetyInput,
   FixSafetyPlan,
-  LsofClassification
+  LsofClassification,
+  MaintenanceReport
 } from './types.js';
 
 export function classifyLsofResult(
@@ -49,6 +51,41 @@ export function planFixSafety(input: FixSafetyInput): FixSafetyPlan {
   if (!input.lsofUsable) reasons.push('open-handle check is unavailable');
   if (input.processListTruncated) reasons.push('process list check was truncated');
   return { allowed: reasons.length === 0, reasons };
+}
+
+export function deriveFixReadiness(report: Pick<
+  MaintenanceReport,
+  'command' | 'status' | 'findings' | 'blockedReasons'
+>): FixReadiness {
+  const reasons = new Set<string>();
+  for (const reason of report.blockedReasons ?? []) reasons.add(reason);
+
+  if (report.command !== 'doctor') {
+    reasons.add('not a doctor report');
+    return { safe: false, reasons: [...reasons] };
+  }
+
+  if (report.status !== 'ok') reasons.add(`diagnosis status is ${report.status}`);
+
+  const findings = report.findings as Record<string, unknown>;
+  const openHandles = findings.openHandles as { usable?: boolean; openHandles?: boolean } | undefined;
+  if (!openHandles || openHandles.usable !== true) {
+    reasons.add('open-handle check is unavailable');
+  } else if (openHandles.openHandles) {
+    reasons.add('target database is open by a process');
+  }
+
+  const knownProcess = findings.knownCodexProcessExists;
+  if (knownProcess === true) {
+    reasons.add('known Codex process is running');
+  } else if (knownProcess !== false) {
+    reasons.add('process list check is unavailable');
+  }
+
+  return {
+    safe: reasons.size === 0,
+    reasons: [...reasons]
+  };
 }
 
 export function parseKnownCodexProcess(psOutput: string, currentPid = process.pid): boolean {

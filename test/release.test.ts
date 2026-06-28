@@ -83,7 +83,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.0',
+      toolVersion: '0.1.1',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -105,10 +105,10 @@ describe('release readiness', () => {
 
     const output = renderReport(report, '/tmp/example/report.json');
 
-    expect(output).toContain('Safe to run fix --safe --yes: yes');
-    expect(output).toContain('What changed: redacted report only');
-    expect(output).toContain('Report saved: <absolute-path>');
-    expect(output).toContain('Review with: npm exec --ignore-scripts ai-dev-maintenance@0.1.0 -- report --latest');
+    expect(output).toContain('Fix readiness   ready');
+    expect(output).toContain('Changed         redacted report only');
+    expect(output).toContain('Report          <absolute-path>');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -120,7 +120,7 @@ describe('release readiness', () => {
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.0',
+      toolVersion: '0.1.1',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -139,7 +139,7 @@ describe('release readiness', () => {
 
     const output = renderReport(report);
 
-    expect(output).toContain('What changed: private backup created + checkpoint attempted; review report');
+    expect(output).toContain('Changed         private backup created + checkpoint attempted; review report');
     expect(output).not.toContain('nothing; fix was blocked');
   });
 

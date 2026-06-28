@@ -15,6 +15,11 @@ export type GuidedOptions = {
   commands: GuidedCommands;
   wait: boolean;
   waitTimeoutMinutes: number;
+  banner: {
+    enabled: boolean;
+    color: boolean;
+    columns: number;
+  };
   sleep: (ms: number) => Promise<void>;
   now: () => number;
 };
@@ -27,7 +32,9 @@ export type GuidedResult = {
 
 export async function runGuidedCli(options: GuidedOptions): Promise<GuidedResult> {
   try {
-    await options.io.write(bannerText());
+    if (options.banner.enabled) {
+      await options.io.write(bannerText({ style: 'hero', color: options.banner.color, columns: options.banner.columns }));
+    }
     await options.io.write('Checking whether Codex cleanup is safe...\n');
     await options.io.write('AIDM will not delete chats, rewrite history, or touch Codex while it is open.\n\n');
 
@@ -46,6 +53,7 @@ async function handleDoctorResult(
   const readiness = deriveFixReadiness(diagnosis.report);
   if (readiness.safe) return handleReady(options, diagnosis);
 
+  await options.io.write('Codex is using the log database. Cleanup is paused.\n');
   await options.io.write(row('Status', 'Paused for safety') + '\n');
   await options.io.write(row('Reason', readiness.reasons.join('; ') || 'not safe to clean yet') + '\n');
   await options.io.write(row('Target', diagnosis.report.target.pathCategory) + '\n');
@@ -85,6 +93,7 @@ async function handleReady(
   diagnosis: { report: MaintenanceReport; reportPath?: string }
 ): Promise<GuidedResult> {
   await options.io.write(row('Status', 'Ready to clean') + '\n');
+  await options.io.write('Expected cleanup: WAL checkpoint/truncate only.\n');
   await options.io.write(row('Target', diagnosis.report.target.pathCategory) + '\n');
   for (const line of targetSizeRows(diagnosis.report)) await options.io.write(`${line}\n`);
   await options.io.write('\nCodex is closed and no open database handles were found.\n');

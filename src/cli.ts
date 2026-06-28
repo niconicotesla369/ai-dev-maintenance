@@ -5,7 +5,7 @@ import { routeCli, type CliResult, type CliRuntimeOptions } from './cli-router.j
 
 export { fixSafeConfirmationError } from './cli-router.js';
 export { renderReport } from './cli-render.js';
-export { shouldShowBanner } from './cli-banner.js';
+export { bannerText, chooseBannerStyle, shouldShowBanner } from './cli-banner.js';
 
 export async function runCli(argv = process.argv.slice(2), runtime: CliRuntimeOptions = {}): Promise<CliResult> {
   return routeCli(argv, runtime);

@@ -5,15 +5,17 @@ export type ParsedCli = {
   json: boolean;
   showPaths: boolean;
   noBanner: boolean;
+  plain: boolean;
   noInteractive: boolean;
   wait: boolean;
   waitTimeoutMinutes: number;
 };
 
 export function parseCliArgs(argv: string[]): ParsedCli {
-  const noCommand = argv.length === 0 || argv[0]?.startsWith('-') === true;
-  const command = noCommand ? 'doctor' : argv[0] ?? 'doctor';
-  const args = noCommand ? argv : argv.slice(1);
+  const commandIndex = findCommandIndex(argv);
+  const noCommand = commandIndex === -1;
+  const command = noCommand ? 'doctor' : argv[commandIndex] ?? 'doctor';
+  const args = noCommand ? argv : [...argv.slice(0, commandIndex), ...argv.slice(commandIndex + 1)];
   return {
     command,
     args,
@@ -21,10 +23,23 @@ export function parseCliArgs(argv: string[]): ParsedCli {
     json: args.includes('--json'),
     showPaths: args.includes('--show-paths'),
     noBanner: args.includes('--no-banner'),
+    plain: args.includes('--plain'),
     noInteractive: args.includes('--no-interactive'),
     wait: args.includes('--wait'),
     waitTimeoutMinutes: parseWaitTimeoutMinutes(args)
   };
+}
+
+function findCommandIndex(argv: string[]): number {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--wait-timeout') {
+      index += 1;
+      continue;
+    }
+    if (!arg.startsWith('-')) return index;
+  }
+  return -1;
 }
 
 export function unknownFlagError(args: string[], allowed: Set<string>, command: string): string | undefined {
@@ -50,7 +65,8 @@ export function invalidWaitTimeoutError(args: string[]): string | undefined {
 export function usageText(): string {
   return [
     'Usage:',
-    '  ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive]',
+    '  ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--no-banner] [--plain]',
+    '  ai-dev-maintenance logo [--plain]',
     '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
     '  ai-dev-maintenance fix --safe --yes',
     '  ai-dev-maintenance report --latest [--show-paths]',

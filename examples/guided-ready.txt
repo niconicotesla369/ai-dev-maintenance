@@ -1,10 +1,15 @@
-AI DEV MAINTENANCE
-Codex log doctor
+    AAAAA   III  DDDD   M   M
+    A   A    I   D   D  MM MM
+    AAAAA    I   D   D  M M M
+    A   A    I   D   D  M   M
+    A   A   III  DDDD   M   M
+      AI Dev Maintenance
 
 Checking whether Codex cleanup is safe...
 AIDM will not delete chats, rewrite history, or touch Codex while it is open.
 
 Status          Ready to clean
+Expected cleanup: WAL checkpoint/truncate only.
 Target          <home>/.codex/logs_2.sqlite
 Main DB         46.7 MiB
 WAL             5.2 MiB

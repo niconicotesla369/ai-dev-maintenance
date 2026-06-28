@@ -4,6 +4,8 @@ export type CliIo = {
   input?: string;
   isInputTty?: boolean;
   isOutputTty?: boolean;
+  columns?: number;
+  noColor?: boolean;
   write?: (text: string) => void | Promise<void>;
   readLine?: (prompt: string) => Promise<string>;
 };
@@ -11,6 +13,8 @@ export type CliIo = {
 export type NormalizedCliIo = {
   isInputTty: boolean;
   isOutputTty: boolean;
+  columns: number;
+  noColor: boolean;
   writesLive: boolean;
   write: (text: string) => Promise<void>;
   readLine: (prompt: string) => Promise<string>;
@@ -23,6 +27,8 @@ export function normalizeCliIo(io?: CliIo): NormalizedCliIo {
   return {
     isInputTty: process.stdin.isTTY === true,
     isOutputTty: process.stdout.isTTY === true,
+    columns: process.stdout.columns ?? 80,
+    noColor: process.env.NO_COLOR !== undefined,
     writesLive: true,
     write: async (text) => {
       process.stdout.write(text);
@@ -51,6 +57,8 @@ function normalizeInjectedIo(io: CliIo): NormalizedCliIo {
   return {
     isInputTty: io.isInputTty === true,
     isOutputTty: io.isOutputTty === true,
+    columns: io.columns ?? 80,
+    noColor: io.noColor === true,
     writesLive: false,
     write,
     readLine: async (prompt) => {

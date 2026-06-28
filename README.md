@@ -11,21 +11,22 @@ The first release is intentionally small. It focuses on macOS, redacted reports,
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.1.3
+npx --yes ai-dev-maintenance@0.1.4
 ```
 
 In a normal terminal this starts a guided flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
+v0.1.4 adds a small terminal banner for screenshot-friendly guided usage while keeping JSON and CI output plain.
 
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- doctor --show-paths
 ```
 
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.1.3
+npm install -g ai-dev-maintenance@0.1.4
 aidm
 ```
 
@@ -36,19 +37,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -63,14 +64,16 @@ If AI coding tools are still open, `doctor` can complete but `fix --safe --yes` 
 
 ```bash
 ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive]
+ai-dev-maintenance logo [--plain]
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive]
+aidm logo [--plain]
 aidm doctor [--json] [--show-paths] [--no-banner]
 ```
 
-Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `doctor --json` for scripts.
+Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` to disable ANSI color. Use `doctor --json` for scripts.
 
 ## Safety Guarantees
 
@@ -112,7 +115,7 @@ The saved report includes:
 - `nextSafeAction`
 
 See `examples/sample-report.json` for a redacted example.
-Human output examples are available in `examples/doctor-blocked.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
+Human output examples are available in `examples/logo.txt`, `examples/doctor-blocked.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
 
 Redacted reports keep high-level target categories, existence flags, file sizes, command status, and reclaim metrics. They remove raw local-machine identifiers, raw command output, and absolute local paths. `--show-paths` prints only redacted report paths.
 

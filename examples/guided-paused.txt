@@ -1,9 +1,14 @@
-AI DEV MAINTENANCE
-Codex log doctor
+    AAAAA   III  DDDD   M   M
+    A   A    I   D   D  MM MM
+    AAAAA    I   D   D  M M M
+    A   A    I   D   D  M   M
+    A   A   III  DDDD   M   M
+      AI Dev Maintenance
 
 Checking whether Codex cleanup is safe...
 AIDM will not delete chats, rewrite history, or touch Codex while it is open.
 
+Codex is using the log database. Cleanup is paused.
 Status          Paused for safety
 Reason          target database is open by a process; known Codex process is running
 Target          <home>/.codex/logs_2.sqlite

@@ -42,7 +42,7 @@ describe('human CLI output', () => {
     }));
 
     expect(output).toContain('Fix readiness   ready');
-    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.1.3 -- fix --safe --yes');
+    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.1.4 -- fix --safe --yes');
     expect(output).toContain('Main DB         46.7 MiB');
     expect(output).toContain('WAL             5.2 MiB');
     expect(output).toContain('SHM             1.0 MiB');
@@ -65,7 +65,7 @@ describe('human CLI output', () => {
   test('does not show doctor-only fix readiness on fix reports', () => {
     const output = renderReport({
       schemaVersion: 1,
-      toolVersion: '0.1.3',
+      toolVersion: '0.1.4',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'ok',
@@ -117,15 +117,16 @@ describe('doctor fix readiness report field', () => {
   });
 });
 
-describe('public docs for v0.1.3 UX', () => {
+describe('public docs for v0.1.4 UX', () => {
   test('readmes document the short npx path and pinned safe path', async () => {
     const readmes = [
       await readFile('README.md', 'utf8'),
       await readFile('README.ja.md', 'utf8')
     ].join('\n');
 
-    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.1.3');
-    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.3 -- doctor --show-paths');
+    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.1.4');
+    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- doctor --show-paths');
+    expect(readmes).toContain('aidm logo');
     expect(readmes).toContain('AI coding tools are still open');
   });
 });
@@ -133,7 +134,7 @@ describe('public docs for v0.1.3 UX', () => {
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.3',
+    toolVersion: '0.1.4',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

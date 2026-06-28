@@ -4,7 +4,7 @@ import { redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup as defaultValidateRestoreBackup } from './restore.js';
 import type { MaintenanceReport } from './types.js';
-import { shouldShowBanner } from './cli-banner.js';
+import { bannerText, shouldShowBanner } from './cli-banner.js';
 import { invalidWaitTimeoutError, parseCliArgs, unknownFlagError, usageText } from './cli-args.js';
 import type { CliIo } from './cli-io.js';
 import { normalizeCliIo } from './cli-io.js';
@@ -47,11 +47,29 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   const waitTimeoutError = invalidWaitTimeoutError(parsed.args);
   if (waitTimeoutError) return { exitCode: 2, output: waitTimeoutError };
 
+  if (parsed.command === 'logo') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--plain']), 'logo');
+    if (flagError) return { exitCode: 2, output: flagError };
+    return {
+      exitCode: 0,
+      output: bannerText({
+        style: 'hero',
+        columns: io.columns,
+        color: parsed.plain !== true && env.NO_COLOR === undefined && io.noColor !== true
+      })
+    };
+  }
+
   if (shouldUseGuidedMode(parsed, env, io)) {
     return runGuidedCli({
       io,
       wait: parsed.wait,
       waitTimeoutMinutes: parsed.waitTimeoutMinutes,
+      banner: {
+        enabled: !parsed.noBanner,
+        color: parsed.plain !== true && env.NO_COLOR === undefined && io.noColor !== true,
+        columns: io.columns
+      },
       sleep: runtime.sleep ?? sleep,
       now: runtime.now ?? Date.now,
       commands: {
@@ -62,7 +80,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   }
 
   if (parsed.command === 'doctor') {
-    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--show-paths', '--no-banner', '--no-interactive']), 'doctor');
+    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--show-paths', '--no-banner', '--no-interactive', '--plain']), 'doctor');
     if (flagError) return { exitCode: 2, output: flagError };
     const { report, reportPath } = await commands.runDoctor({ json: parsed.json, showPaths: parsed.showPaths });
     const outputReport = sanitizeReportForOutput(report);
@@ -71,6 +89,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
       noBanner: parsed.noBanner,
       ci: env.CI !== undefined,
       noColor: env.NO_COLOR !== undefined,
+      plain: parsed.plain,
       isTty: io.isOutputTty
     });
     return {

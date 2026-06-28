@@ -26,7 +26,9 @@ describe('guided interactive CLI', () => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.output).toContain('AI DEV MAINTENANCE');
+    expect(result.output).toContain('AAAAA   III  DDDD');
+    expect(result.output).toContain('AI Dev Maintenance');
+    expect(result.output).toContain('Codex is using the log database. Cleanup is paused.');
     expect(result.output).toContain('Paused for safety');
     expect(result.output).toContain('Codex is still open, so AIDM will not clean anything yet.');
     expect(result.output).toContain('Nothing was changed except a redacted local report.');
@@ -73,6 +75,7 @@ describe('guided interactive CLI', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('Ready to clean');
+    expect(result.output).toContain('Expected cleanup: WAL checkpoint/truncate only.');
     expect(result.output).toContain('Clean now? [y/N]');
     expect(result.output).toContain('Before WAL      5.0 MiB');
     expect(result.output).toContain('After WAL       0.0 MiB');
@@ -151,6 +154,98 @@ describe('guided interactive CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('Fix readiness   ready');
     expect(result.output).not.toContain('Clean now?');
+  });
+
+  test('no-banner suppresses guided banner without disabling interaction', async () => {
+    const result = await runCli(['--no-banner'], {
+      env: {},
+      io: memoryIo('4\n', true, 100),
+      commands: {
+        runDoctor: async () => ({
+          report: makeDoctorReport({
+            findings: {
+              openHandles: { usable: true, openHandles: true },
+              knownCodexProcessExists: true
+            }
+          }),
+          reportPath: '/tmp/report.json'
+        }),
+        runFixSafe: async () => ({ report: makeFixReport('ok'), reportPath: '/tmp/fix.json' })
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).not.toContain('AAAAA   III  DDDD');
+    expect(result.output).not.toContain('AI DEV MAINTENANCE');
+    expect(result.output).toContain('What do you want to do?');
+  });
+
+  test('plain mode disables ANSI color in guided banner', async () => {
+    const result = await runCli(['--plain'], {
+      env: {},
+      io: memoryIo('4\n', true, 100),
+      commands: {
+        runDoctor: async () => ({
+          report: makeDoctorReport({
+            findings: {
+              openHandles: { usable: true, openHandles: true },
+              knownCodexProcessExists: true
+            }
+          }),
+          reportPath: '/tmp/report.json'
+        }),
+        runFixSafe: async () => ({ report: makeFixReport('ok'), reportPath: '/tmp/fix.json' })
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('AAAAA   III  DDDD');
+    expect(result.output).not.toContain('\u001b[');
+  });
+
+  test('logo command is display-only and does not run doctor or fix', async () => {
+    let doctorCalls = 0;
+    let fixCalls = 0;
+    const result = await runCli(['logo'], {
+      env: {},
+      io: memoryIo('', true, 100),
+      commands: {
+        runDoctor: async () => {
+          doctorCalls += 1;
+          return { report: makeDoctorReport({}), reportPath: '/tmp/report.json' };
+        },
+        runFixSafe: async () => {
+          fixCalls += 1;
+          return { report: makeFixReport('ok'), reportPath: '/tmp/fix.json' };
+        }
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('AAAAA   III  DDDD');
+    expect(result.output).toContain('AI Dev Maintenance');
+    expect(doctorCalls).toBe(0);
+    expect(fixCalls).toBe(0);
+  });
+
+  test('leading plain flag still routes to logo without running doctor', async () => {
+    let doctorCalls = 0;
+    const result = await runCli(['--plain', 'logo'], {
+      env: {},
+      io: memoryIo('', true, 100),
+      commands: {
+        runDoctor: async () => {
+          doctorCalls += 1;
+          return { report: makeDoctorReport({}), reportPath: '/tmp/report.json' };
+        },
+        runFixSafe: async () => ({ report: makeFixReport('ok'), reportPath: '/tmp/fix.json' })
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('AAAAA   III  DDDD');
+    expect(result.output).not.toContain('\u001b[');
+    expect(doctorCalls).toBe(0);
   });
 
   test('wait mode polls until the database is released before asking for cleanup', async () => {
@@ -259,18 +354,19 @@ describe('guided interactive CLI', () => {
   });
 });
 
-function memoryIo(input: string, isTty: boolean) {
+function memoryIo(input: string, isTty: boolean, columns = 80) {
   return {
     input,
     isInputTty: isTty,
-    isOutputTty: isTty
+    isOutputTty: isTty,
+    columns
   };
 }
 
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.3',
+    toolVersion: '0.1.4',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -289,7 +385,7 @@ function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceRep
 function makeFixReport(status: MaintenanceReport['status'], metrics: MaintenanceReport['metrics'] = {}): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.3',
+    toolVersion: '0.1.4',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'fix --safe',
     status,

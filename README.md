@@ -11,31 +11,38 @@ The first release is intentionally small. It focuses on macOS, redacted reports,
 Quick diagnosis:
 
 ```bash
-npx --yes ai-dev-maintenance@0.1.1
+npx --yes ai-dev-maintenance@0.1.2
 ```
 
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
+```
+
+Short command after global install:
+
+```bash
+npm install -g ai-dev-maintenance@0.1.2
+aidm
 ```
 
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.1 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.2 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -52,6 +59,7 @@ If AI coding tools are still open, `doctor` can complete but `fix --safe --yes` 
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
+aidm doctor [--json] [--show-paths] [--no-banner]
 ```
 
 ## Safety Guarantees

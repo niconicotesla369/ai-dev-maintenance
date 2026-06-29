@@ -251,6 +251,7 @@ describe('guided interactive CLI', () => {
   test('wait mode polls until the database is released before asking for cleanup', async () => {
     let doctorCalls = 0;
     let fixCalls = 0;
+    const persistValues: Array<boolean | undefined> = [];
     const result = await runCli(['--wait', '--wait-timeout', '1'], {
       env: {},
       io: memoryIo('y\n', true),
@@ -260,7 +261,8 @@ describe('guided interactive CLI', () => {
         return () => tick++ * 1_000;
       })(),
       commands: {
-        runDoctor: async () => {
+        runDoctor: async (options?: { persistReport?: boolean }) => {
+          persistValues.push(options?.persistReport);
           doctorCalls += 1;
           return {
             report:
@@ -291,6 +293,8 @@ describe('guided interactive CLI', () => {
     expect(result.output).toContain('Waiting for Codex to close safely');
     expect(result.output).toContain('Ready to clean');
     expect(doctorCalls).toBeGreaterThanOrEqual(2);
+    expect(persistValues[0]).not.toBe(false);
+    expect(persistValues.slice(1)).toContain(false);
     expect(fixCalls).toBe(1);
   });
 
@@ -366,7 +370,7 @@ function memoryIo(input: string, isTty: boolean, columns = 80) {
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.4',
+    toolVersion: '0.1.5',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -385,7 +389,7 @@ function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceRep
 function makeFixReport(status: MaintenanceReport['status'], metrics: MaintenanceReport['metrics'] = {}): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.4',
+    toolVersion: '0.1.5',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'fix --safe',
     status,

@@ -1,7 +1,7 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { sanitizeReportForOutput } from '../src/reports.js';
+import { sanitizeReportForOutput, writeReport } from '../src/reports.js';
 import { redactPath } from '../src/paths.js';
 import { formatCliError } from '../src/cli.js';
 import type { MaintenanceReport } from '../src/types.js';
@@ -67,6 +67,55 @@ describe('privacy boundaries', () => {
     expect(sanitized).not.toContain(['', 'private', 'var'].join('/'));
     expect(sanitized).not.toContain(['', 'Volumes'].join('/'));
     expect(sanitized).not.toContain(['', 'tmp', 'example'].join('/'));
+  });
+
+  test('sanitizes reports before writing them to disk', async () => {
+    const rawPath = ['', 'Users', 'example', '.codex', 'logs_2.sqlite'].join('/');
+    const report: MaintenanceReport = {
+      schemaVersion: 1,
+      toolVersion: '0.1.5',
+      generatedAt: '2026-01-01T00:00:00.123Z',
+      command: 'doctor',
+      status: 'partial',
+      redacted: true,
+      target: {
+        kind: 'default-codex-log-db',
+        pathCategory: rawPath
+      },
+      findings: {
+        targetState: {
+          main: {
+            pathCategory: 'codex-log-db-main',
+            exists: true,
+            regularFile: true,
+            symbolicLink: false,
+            size: 1,
+            dev: 1,
+            ino: 2,
+            uid: 501,
+            gid: 20,
+            mode: 33152,
+            mtimeMs: 1,
+            realpath: rawPath
+          }
+        },
+        stdout: rawPath,
+        stderr: rawPath
+      },
+      metrics: {},
+      blockedReasons: [rawPath]
+    };
+
+    const written = await writeReport(report);
+    try {
+      const saved = await readFile(written, 'utf8');
+
+      expect(saved).not.toMatch(/"dev"|"ino"|"uid"|"gid"|"mode"|"mtimeMs"|"realpath"|"stdout"|"stderr"/);
+      expect(saved).not.toContain(rawPath);
+      expect(saved).toContain('<home>/.codex/logs_2.sqlite');
+    } finally {
+      await rm(written, { force: true });
+    }
   });
 
   test('redacts absolute paths with spaces', () => {

@@ -24,14 +24,19 @@ export function classifyLsofResult(
   }
   const stdout = result.stdout.trim();
   const stderr = result.stderr.trim();
-  if (stderr.length > 0) {
+  const onlyMissingPathWarnings = stderr.length > 0 && stderr
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .every(isMissingPathWarning);
+  if (stderr.length > 0 && !onlyMissingPathWarnings) {
     const lower = stderr.toLowerCase();
     if (lower.includes('permission denied') || lower.includes('operation not permitted')) {
       return { usable: false, openHandles: false, reason: 'permission_denied' };
     }
     return { usable: false, openHandles: false, reason: 'nonzero_stderr' };
   }
-  if (result.code === 0) {
+  if (result.code === 0 || (result.code === 1 && onlyMissingPathWarnings)) {
     return {
       usable: true,
       openHandles: stdout.length > 0,
@@ -46,7 +51,6 @@ export function classifyLsofResult(
 
 export function planFixSafety(input: FixSafetyInput): FixSafetyPlan {
   const reasons: string[] = [];
-  if (input.knownCodexProcessExists) reasons.push('known Codex process is running');
   if (input.anyOpenHandleOnTarget) reasons.push('target database is open by a process');
   if (!input.lsofUsable) reasons.push('open-handle check is unavailable');
   if (input.processListTruncated) reasons.push('process list check was truncated');
@@ -75,13 +79,6 @@ export function deriveFixReadiness(report: Pick<
     reasons.add('target database is open by a process');
   }
 
-  const knownProcess = findings.knownCodexProcessExists;
-  if (knownProcess === true) {
-    reasons.add('known Codex process is running');
-  } else if (knownProcess !== false) {
-    reasons.add('process list check is unavailable');
-  }
-
   return {
     safe: reasons.size === 0,
     reasons: [...reasons]
@@ -96,6 +93,16 @@ export function parseKnownCodexProcess(psOutput: string, currentPid = process.pi
     .some((line) => {
       const pid = Number(line.split(/\s+/, 1)[0]);
       if (pid === currentPid) return false;
-      return /\b(Codex|codex|codex-cli|Codex Helper|OpenAI Codex|com\.openai\.codex)\b/.test(line);
+      const withoutPid = line.replace(/^\d+\s+/, '');
+      const commandPath = withoutPid.split(/\s+/, 1)[0] ?? '';
+      const basename = commandPath.split('/').at(-1);
+      if (commandPath.includes('/Applications/Codex.app/')) return false;
+      if (basename === 'codex' || basename === 'codex-cli') return true;
+      return /\bcom\.openai\.codex\b/.test(withoutPid) && !/\.codex[/?\s]/.test(withoutPid);
     });
+}
+
+function isMissingPathWarning(line: string): boolean {
+  const lower = line.toLowerCase();
+  return lower.startsWith('lsof: status error on ') && lower.includes('no such file or directory');
 }

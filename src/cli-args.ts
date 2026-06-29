@@ -37,6 +37,7 @@ function findCommandIndex(argv: string[]): number {
       index += 1;
       continue;
     }
+    if (arg.startsWith('--wait-timeout=')) continue;
     if (!arg.startsWith('-')) return index;
   }
   return -1;
@@ -47,6 +48,7 @@ export function unknownFlagError(args: string[], allowed: Set<string>, command: 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (!arg.startsWith('-')) continue;
+    if (arg.startsWith('--wait-timeout=') && allowed.has('--wait-timeout')) continue;
     if (!allowed.has(arg)) unknown.push(arg);
     if (arg === '--wait-timeout') index += 1;
   }
@@ -54,8 +56,8 @@ export function unknownFlagError(args: string[], allowed: Set<string>, command: 
 }
 
 export function invalidWaitTimeoutError(args: string[]): string | undefined {
-  if (!args.includes('--wait-timeout')) return undefined;
-  const raw = args[args.indexOf('--wait-timeout') + 1];
+  const raw = rawWaitTimeout(args);
+  if (raw === undefined) return undefined;
   if (!raw || raw.startsWith('-')) return `Missing --wait-timeout <minutes>.\n${usageText()}`;
   const minutes = Number(raw);
   if (!Number.isFinite(minutes) || minutes <= 0) return `Invalid --wait-timeout: ${raw}\n${usageText()}`;
@@ -70,13 +72,23 @@ export function usageText(): string {
     '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
     '  ai-dev-maintenance fix --safe --yes',
     '  ai-dev-maintenance report --latest [--show-paths]',
+    '  ai-dev-maintenance reports prune --yes',
+    '  ai-dev-maintenance backups prune --yes',
     '  ai-dev-maintenance restore validate --backup <path>'
   ].join('\n') + '\n';
 }
 
 function parseWaitTimeoutMinutes(args: string[]): number {
-  const index = args.indexOf('--wait-timeout');
-  if (index === -1) return 10;
-  const parsed = Number(args[index + 1]);
+  const raw = rawWaitTimeout(args);
+  if (raw === undefined) return 10;
+  const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
+}
+
+function rawWaitTimeout(args: string[]): string | undefined {
+  const equals = args.find((arg) => arg.startsWith('--wait-timeout='));
+  if (equals) return equals.slice('--wait-timeout='.length);
+  const index = args.indexOf('--wait-timeout');
+  if (index === -1) return undefined;
+  return args[index + 1];
 }

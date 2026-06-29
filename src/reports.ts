@@ -2,6 +2,7 @@ import { readFile, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { assertPrivateAppDirSafe, assertSafeReadablePrivateFile } from './fs-safety.js';
 import { appDataHome, redactPath } from './paths.js';
+import { pruneReports } from './retention.js';
 import type { MaintenanceReport } from './types.js';
 
 export async function ensurePrivateDir(dir: string): Promise<void> {
@@ -14,9 +15,16 @@ export async function ensurePrivateDir(dir: string): Promise<void> {
 export async function writeReport(report: MaintenanceReport): Promise<string> {
   const dir = path.join(appDataHome(), 'reports');
   await ensurePrivateDir(dir);
-  const stamp = report.generatedAt.replace(/[:.]/g, '-');
+  const sanitized = sanitizeReportForOutput(report);
+  const retention = await pruneReports(dir).catch((error) => ({
+    deleted: 0,
+    warnings: [error instanceof Error ? error.message : String(error)]
+  }));
+  for (const warning of retention.warnings) addWarning(sanitized, `report retention: ${warning}`);
+  const stamp = sanitized.generatedAt.replace(/[:.]/g, '-');
   const file = path.join(dir, `report-${stamp}.json`);
-  await writeFile(file, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+  await writeFile(file, `${JSON.stringify(sanitized, null, 2)}\n`, { mode: 0o600, flag: 'wx' });
+  await pruneReports(dir).catch(() => undefined);
   return file;
 }
 
@@ -109,6 +117,12 @@ function isForbiddenReportKey(key: string): boolean {
     'stderr',
     'stdout'
   ]).has(key);
+}
+
+function addWarning(report: MaintenanceReport, warning: string): void {
+  const findings = report.findings as Record<string, unknown>;
+  const existing = Array.isArray(findings.warnings) ? findings.warnings.map(String) : [];
+  findings.warnings = [...existing, sanitizeString(warning)];
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

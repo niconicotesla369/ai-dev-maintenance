@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { trustedCommandPath, runCommand } from './commands.js';
-import { detectTargetState, safeTargetStateForReport } from './fs-safety.js';
+import { detectTargetState, pathExists, safeTargetStateForReport } from './fs-safety.js';
 import { defaultCodexHome, redactPath, targetTriple } from './paths.js';
 import { writeReport } from './reports.js';
 import { classifyLsofResult, deriveFixReadiness, parseKnownCodexProcess } from './safety.js';
@@ -11,6 +11,7 @@ import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from './version.js';
 export async function runDoctor(options: {
   json?: boolean;
   showPaths?: boolean;
+  persistReport?: boolean;
   platform?: NodeJS.Platform;
   env?: NodeJS.ProcessEnv;
 } = {}): Promise<{ report: MaintenanceReport; reportPath?: string }> {
@@ -47,15 +48,22 @@ export async function runDoctor(options: {
     reason: 'source database inspection is skipped in v1 to avoid copying private log bytes'
   };
 
-  const reportPath = await writeReport(report);
-  if (options.showPaths) report.findings.reportPath = redactPath(reportPath);
+  const reportPath = options.persistReport === false ? undefined : await writeReport(report);
+  if (options.showPaths && reportPath) report.findings.reportPath = redactPath(reportPath);
   return { report, reportPath };
 }
 
 export async function checkOpenHandles(paths: string[]) {
   try {
+    const existingPaths = [];
+    for (const candidate of paths) {
+      if (await pathExists(candidate)) existingPaths.push(candidate);
+    }
+    if (existingPaths.length === 0) {
+      return { usable: true, openHandles: false, reason: 'no target files exist' };
+    }
     const lsof = await trustedCommandPath('lsof');
-    const result = await runCommand(lsof, ['-F', 'pcn', ...paths], { timeoutMs: 5_000 });
+    const result = await runCommand(lsof, ['-F', 'pcn', ...existingPaths], { timeoutMs: 5_000 });
     return classifyLsofResult(result);
   } catch (error) {
     return {

@@ -10,6 +10,7 @@ import {
   planFixSafety,
   redactPath
 } from '../src/index.js';
+import { deriveFixReadiness, parseKnownCodexProcess } from '../src/safety.js';
 
 describe('SQLite safety', () => {
   test('uses file URI mode and rejects plain sqlite paths', () => {
@@ -32,15 +33,15 @@ describe('SQLite safety', () => {
 });
 
 describe('process and command safety', () => {
-  test('blocks fix when any known Codex process exists', () => {
+  test('does not block fix when a known Codex process is only advisory', () => {
     const plan = planFixSafety({
       knownCodexProcessExists: true,
       anyOpenHandleOnTarget: false,
       lsofUsable: true
     });
 
-    expect(plan.allowed).toBe(false);
-    expect(plan.reasons).toContain('known Codex process is running');
+    expect(plan.allowed).toBe(true);
+    expect(plan.reasons).not.toContain('known Codex process is running');
   });
 
   test('blocks fix when lsof cannot prove the target is closed', () => {
@@ -70,6 +71,44 @@ describe('process and command safety', () => {
       openHandles: false,
       reason: 'nonzero_stderr'
     });
+  });
+
+  test('treats missing lsof sidecar warnings as benign when no handles are reported', () => {
+    const stderr = [
+      'lsof: status error on /tmp/logs_2.sqlite-wal: No such file or directory',
+      'lsof: status error on /tmp/logs_2.sqlite-shm: No such file or directory'
+    ].join('\n');
+
+    expect(classifyLsofResult({ code: 1, stdout: '', stderr })).toEqual({
+      usable: true,
+      openHandles: false,
+      reason: 'no open handles reported'
+    });
+  });
+
+  test('does not block doctor fix readiness on Codex-like process names alone', () => {
+    const readiness = deriveFixReadiness({
+      command: 'doctor',
+      status: 'ok',
+      findings: {
+        openHandles: { usable: true, openHandles: false },
+        knownCodexProcessExists: true
+      },
+      blockedReasons: []
+    });
+
+    expect(readiness).toEqual({ safe: true, reasons: [] });
+  });
+
+  test('does not treat unrelated Codex-named processes as active Codex writers', () => {
+    const psOutput = [
+      '123 /Applications/Codex.app/Contents/MacOS/Codex /Applications/Codex.app/Contents/MacOS/Codex',
+      '124 /Applications/Codex.app/Contents/Frameworks/Codex Framework.framework/Helpers/Codex (Service) --type=gpu-process',
+      '125 /usr/bin/vim vim <home>/.codex/notes.md',
+      '126 /usr/bin/sqlite3 sqlite3 file:///Users/example/.codex/logs_2.sqlite?mode=rw'
+    ].join('\n');
+
+    expect(parseKnownCodexProcess(psOutput, 999)).toBe(false);
   });
 
   test('trusts only root-owned non-writable absolute system commands', () => {

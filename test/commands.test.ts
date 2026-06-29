@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { runCommand } from '../src/commands.js';
+import { checkOpenHandles } from '../src/doctor.js';
 import { classifyLsofResult, planFixSafety } from '../src/safety.js';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 describe('command execution safety', () => {
   test('does not pass the real HOME to subprocesses by default', async () => {
@@ -61,5 +65,23 @@ describe('command execution safety', () => {
     expect(result.usable).toBe(false);
     expect(result.reason).toBe('permission_denied');
     expect(JSON.stringify(result)).not.toContain('/private/path');
+  });
+
+  test('checks open handles when only the main database file exists', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'aidm-lsof-main-only-'));
+    try {
+      const main = path.join(dir, 'logs_2.sqlite');
+      await writeFile(main, '');
+
+      const result = await checkOpenHandles([main, `${main}-wal`, `${main}-shm`]);
+
+      expect(result).toEqual({
+        usable: true,
+        openHandles: false,
+        reason: 'no open handles reported'
+      });
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -10,7 +10,7 @@ AIDM will not delete chats, rewrite history, or touch Codex while it is open.
 
 Codex is using the log database. Cleanup is paused.
 Status          Paused for safety
-Reason          target database is open by a process; known Codex process is running
+Reason          target database is open by a process
 Target          <home>/.codex/logs_2.sqlite
 Main DB         46.7 MiB
 WAL             5.2 MiB

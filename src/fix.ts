@@ -7,6 +7,7 @@ import { ensurePrivateDir, writeReport } from './reports.js';
 import { planFixSafety } from './safety.js';
 import { checkSqliteJsonSupport, inspectSqliteSnapshot } from './sqlite.js';
 import { checkOpenHandles, knownCodexProcessExists } from './doctor.js';
+import { pruneBackups } from './retention.js';
 import type { MaintenanceReport } from './types.js';
 import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from './version.js';
 
@@ -67,7 +68,7 @@ export async function runFixSafe(options: {
   report.blockedReasons.push(...(await targetDirectoryBlockers(mainPath)));
   report.blockedReasons.push(
     ...compareTargetIdentities(preflightResult.findings.targetState, beforeMutation.findings.targetState, {
-      allowSidecarSizeMtimeChange: false
+      allowSidecarSizeMtimeChange: true
     })
   );
   if (report.blockedReasons.length > 0) {
@@ -86,16 +87,15 @@ export async function runFixSafe(options: {
   try {
     report.metrics.checkpointAttempted = true;
     await runCheckpoint(sqlite, dbUri);
-    await runCheckpoint(sqlite, dbUri);
   } catch (error) {
     report.status = 'blocked';
     report.blockedReasons.push(error instanceof Error ? error.message : String(error));
     return { report, reportPath: await writeReport(report) };
   }
 
-  const postMutation = await runPreflight(mainPath);
+  const postMutation = await runTargetCheck(mainPath);
   report.blockedReasons.push(
-    ...compareTargetIdentities(beforeMutation.findings.targetState, postMutation.findings.targetState, {
+    ...compareTargetIdentities(beforeMutation.findings.targetState, postMutation.targetState, {
       allowMainSizeMtimeChange: true,
       allowSidecarSizeMtimeChange: true
     })
@@ -109,24 +109,32 @@ export async function runFixSafe(options: {
     report.blockedReasons.push(...postMutation.blockers.map((reason) => `after mutation: ${reason}`));
     return { report, reportPath: await writeReport(report) };
   }
-  const postflight = await runPreflight(mainPath);
-  if (postflight.blockers.length > 0) {
-    report.status = 'blocked';
-    report.blockedReasons.push(...postflight.blockers);
-  } else {
-    report.status = 'ok';
-  }
-  const afterWalBytes = postflight.findings.targetState?.wal?.size ?? 0;
+  report.status = 'ok';
+  const afterWalBytes = postMutation.targetState?.wal?.size ?? 0;
   if (afterWalBytes > 0) {
-    report.status = 'blocked';
-    report.blockedReasons.push('WAL was not truncated');
+    addWarning(report, 'WAL still has bytes after checkpoint');
   }
   report.metrics.beforeWalBytes = beforeWalBytes;
   report.metrics.afterWalBytes = afterWalBytes;
   report.metrics.reclaimedBytes = Math.max(0, Number(beforeWalBytes) - Number(afterWalBytes));
   report.metrics.mainDbForcedShrink = false;
+  const retention = await pruneBackups(path.join(appDataHome(), 'backups'), { keepPath: path.dirname(backup.path) }).catch((error) => ({
+    deleted: 0,
+    warnings: [error instanceof Error ? error.message : String(error)]
+  }));
+  if (retention.warnings.length > 0) {
+    for (const warning of retention.warnings) addWarning(report, `backup retention: ${warning}`);
+  }
   report.nextSafeAction = 'Review the before/after metrics in the saved report.';
   return { report, reportPath: await writeReport(report) };
+}
+
+async function runTargetCheck(mainPath: string) {
+  const targetState = await detectTargetState(mainPath);
+  return {
+    targetState,
+    blockers: targetState.blockers
+  };
 }
 
 async function runPreflight(mainPath: string) {
@@ -231,10 +239,19 @@ async function runCheckpoint(sqlite: string, dbUri: string) {
   if (checkpoint.code !== 0 || checkpoint.stdoutTruncated || checkpoint.stderrTruncated) {
     throw new Error('checkpoint failed');
   }
-  const rows = JSON.parse(checkpoint.stdout || '[]') as Array<{ busy?: number }>;
+  const rows = parseLastSqliteJsonArray(checkpoint.stdout) as Array<{ busy?: number }>;
   if (!checkpointRowsAreComplete(rows)) {
     throw new Error('checkpoint busy');
   }
+}
+
+export function parseLastSqliteJsonArray(stdout: string): unknown[] {
+  const lastJsonLine = stdout
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('['))
+    .at(-1);
+  return JSON.parse(lastJsonLine || '[]') as unknown[];
 }
 
 export function checkpointRowsAreComplete(rows: Array<{ busy?: unknown; log?: unknown; checkpointed?: unknown }>): boolean {
@@ -267,4 +284,10 @@ function baseFixReport(generatedAt: string): MaintenanceReport {
     metrics: {},
     blockedReasons: []
   };
+}
+
+function addWarning(report: MaintenanceReport, warning: string): void {
+  const findings = report.findings as { warnings?: string[] };
+  findings.warnings ??= [];
+  findings.warnings.push(warning);
 }

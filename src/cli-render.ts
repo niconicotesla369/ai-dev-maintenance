@@ -24,7 +24,7 @@ export function renderReport(report: MaintenanceReport, reportPath?: string, sho
   lines.push(...metricRows(report));
   lines.push(row('Changed', whatChanged(report)));
   if (reportPath) {
-    const reportLocation = showPaths ? redactPath(reportPath) : redactPath(reportPath);
+    const reportLocation = showPaths ? reportPath : redactPath(reportPath);
     lines.push(row('Report', reportLocation));
     lines.push(row('Review', `npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest`));
   }

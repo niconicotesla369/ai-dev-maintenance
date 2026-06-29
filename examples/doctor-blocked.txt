@@ -3,12 +3,12 @@ Codex log doctor
 
 Diagnosis       complete
 Fix readiness   blocked
-Reason          target database is open by a process; known Codex process is running
+Reason          target database is open by a process
 Target          <home>/.codex/logs_2.sqlite
 Main DB         46.7 MiB
 WAL             5.2 MiB
 SHM             0.0 MiB
 Changed         redacted report only
 Report          <home>/.ai-dev-maintenance/reports/report-2026-06-28T00-00-00-000Z.json
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.4 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.5 -- report --latest
 Next            Close AI coding tools, then run doctor again.

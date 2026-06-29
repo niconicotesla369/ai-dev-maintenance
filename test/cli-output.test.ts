@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 describe('human CLI output', () => {
-  test('shows blocked fix readiness reason even when blockedReasons is empty', () => {
+  test('does not block fix readiness on Codex advisory process alone', () => {
     const output = renderReport(makeDoctorReport({
       findings: {
         openHandles: { usable: true, openHandles: false },
@@ -22,8 +22,8 @@ describe('human CLI output', () => {
       }
     }));
 
-    expect(output).toContain('Fix readiness   blocked');
-    expect(output).toContain('Reason          known Codex process is running');
+    expect(output).toContain('Fix readiness   ready');
+    expect(output).not.toContain('Reason          known Codex process is running');
     expect(output).not.toContain('Blocked reasons: none');
     expect(output).not.toContain('Safe to run fix --safe --yes');
   });
@@ -42,7 +42,7 @@ describe('human CLI output', () => {
     }));
 
     expect(output).toContain('Fix readiness   ready');
-    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.1.4 -- fix --safe --yes');
+    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.1.5 -- fix --safe --yes');
     expect(output).toContain('Main DB         46.7 MiB');
     expect(output).toContain('WAL             5.2 MiB');
     expect(output).toContain('SHM             1.0 MiB');
@@ -62,10 +62,23 @@ describe('human CLI output', () => {
     expect(renderReport(report, undefined, false, { banner: false })).not.toContain('AI DEV MAINTENANCE');
   });
 
+  test('show paths displays the local report path only in human output', () => {
+    const reportPath = path.join(os.tmpdir(), 'aidm-report.json');
+    const report = makeDoctorReport({
+      findings: {
+        openHandles: { usable: true, openHandles: false },
+        knownCodexProcessExists: false
+      }
+    });
+
+    expect(renderReport(report, reportPath, false)).toContain('Report          <absolute-path>');
+    expect(renderReport(report, reportPath, true)).toContain(`Report          ${reportPath}`);
+  });
+
   test('does not show doctor-only fix readiness on fix reports', () => {
     const output = renderReport({
       schemaVersion: 1,
-      toolVersion: '0.1.4',
+      toolVersion: '0.1.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'ok',
@@ -117,24 +130,24 @@ describe('doctor fix readiness report field', () => {
   });
 });
 
-describe('public docs for v0.1.4 UX', () => {
+describe('public docs for v0.1.5 UX', () => {
   test('readmes document the short npx path and pinned safe path', async () => {
     const readmes = [
       await readFile('README.md', 'utf8'),
       await readFile('README.ja.md', 'utf8')
     ].join('\n');
 
-    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.1.4');
-    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.4 -- doctor --show-paths');
+    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.1.5');
+    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.5 -- doctor --show-paths');
     expect(readmes).toContain('aidm logo');
-    expect(readmes).toContain('AI coding tools are still open');
+    expect(readmes).toContain('target log database is still open');
   });
 });
 
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.1.4',
+    toolVersion: '0.1.5',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

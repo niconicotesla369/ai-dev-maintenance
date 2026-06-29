@@ -6,7 +6,7 @@ import type { MaintenanceReport } from './types.js';
 import { TOOL_VERSION } from './version.js';
 
 export type GuidedCommands = {
-  runDoctor: () => Promise<{ report: MaintenanceReport; reportPath?: string }>;
+  runDoctor: (options?: { persistReport?: boolean }) => Promise<{ report: MaintenanceReport; reportPath?: string }>;
   runFixSafe: () => Promise<{ report: MaintenanceReport; reportPath?: string }>;
 };
 
@@ -120,7 +120,7 @@ async function waitUntilReady(options: GuidedOptions): Promise<GuidedResult> {
   while (options.now() - started < timeoutMs) {
     const elapsed = options.now() - started;
     await options.sleep(elapsed < 30_000 ? 2_000 : 5_000);
-    const diagnosis = await options.commands.runDoctor();
+    const diagnosis = await options.commands.runDoctor({ persistReport: false });
     const readiness = deriveFixReadiness(diagnosis.report);
     if (readiness.safe) {
       await options.io.write('\nDatabase released.\n');

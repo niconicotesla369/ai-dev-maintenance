@@ -85,7 +85,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.4',
+      toolVersion: '0.1.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -110,7 +110,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.4 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.5 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -119,10 +119,46 @@ describe('release readiness', () => {
     expect(source).toContain('renderReport(latest.report');
   });
 
+  test('report latest show-paths prints the local report path only in the human path line', async () => {
+    const latestPath = '/tmp/aidm-report.json';
+    const result = await runCli(['report', '--latest', '--show-paths'], {
+      commands: {
+        latestReport: async () => ({
+          path: latestPath,
+          report: {
+            schemaVersion: 1,
+            toolVersion: '0.1.5',
+            generatedAt: '2026-01-01T00:00:00.000Z',
+            command: 'doctor',
+            status: 'ok',
+            redacted: true,
+            target: {
+              kind: 'default-codex-log-db',
+              pathCategory: '<home>/.codex/logs_2.sqlite'
+            },
+            findings: {
+              openHandles: {
+                usable: true,
+                openHandles: false
+              }
+            },
+            metrics: {},
+            blockedReasons: []
+          }
+        })
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain(`Report: ${latestPath}`);
+    expect(result.output).toContain('"pathCategory": "<home>/.codex/logs_2.sqlite"');
+    expect(result.output).not.toContain('"path": "/tmp/aidm-report.json"');
+  });
+
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.4',
+      toolVersion: '0.1.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -153,7 +189,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.1.4');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.1.5');
     expect(readme).toContain('aidm');
   });
 
@@ -191,6 +227,69 @@ describe('release readiness', () => {
   test('non-mutating commands reject unknown flags', async () => {
     expect((await runCli(['doctor', '--wat'])).output).toContain('Unknown doctor flag');
     expect((await runCli(['report', '--latest', '--wat'])).output).toContain('Unknown report flag');
+  });
+
+  test('no-command guided mode rejects unknown flags before running doctor', async () => {
+    let doctorCalls = 0;
+    const result = await runCli(['--wat'], {
+      env: {},
+      io: {
+        input: '',
+        isInputTty: true,
+        isOutputTty: true,
+        columns: 80
+      },
+      commands: {
+        runDoctor: async () => {
+          doctorCalls += 1;
+          return {
+            report: {
+              schemaVersion: 1,
+              toolVersion: '0.1.5',
+              generatedAt: '2026-01-01T00:00:00.000Z',
+              command: 'doctor',
+              status: 'ok',
+              redacted: true,
+              target: { kind: 'default-codex-log-db', pathCategory: '<home>/.codex/logs_2.sqlite' },
+              findings: {},
+              metrics: {},
+              blockedReasons: []
+            },
+            reportPath: '/tmp/report.json'
+          };
+        }
+      }
+    });
+
+    expect(result.exitCode).toBe(2);
+    expect(result.output).toContain('Unknown doctor flag: --wat');
+    expect(doctorCalls).toBe(0);
+  });
+
+  test('supports equals wait timeout and rejects command-looking timeout values', async () => {
+    const doctorReport: MaintenanceReport = {
+      schemaVersion: 1,
+      toolVersion: '0.1.5',
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      command: 'doctor',
+      status: 'ok',
+      redacted: true,
+      target: { kind: 'default-codex-log-db', pathCategory: '<home>/.codex/logs_2.sqlite' },
+      findings: { openHandles: { usable: true, openHandles: false }, knownCodexProcessExists: false },
+      metrics: {},
+      blockedReasons: []
+    };
+    expect(
+      (await runCli(['--wait-timeout=1', '--no-interactive'], {
+        commands: {
+          runDoctor: async () => ({ report: doctorReport, reportPath: '/tmp/report.json' })
+        }
+      })).exitCode
+    ).toBe(0);
+    const invalid = await runCli(['--wait-timeout', 'doctor']);
+
+    expect(invalid.exitCode).toBe(2);
+    expect(invalid.output).toContain('Invalid --wait-timeout: doctor');
   });
 
   test('direct invocation detection resolves npm bin symlinks', () => {

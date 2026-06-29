@@ -1,6 +1,6 @@
 import { runDoctor as defaultRunDoctor } from './doctor.js';
 import { runFixSafe as defaultRunFixSafe } from './fix.js';
-import { redactPath } from './paths.js';
+import { appDataHome, redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup as defaultValidateRestoreBackup } from './restore.js';
 import type { MaintenanceReport } from './types.js';
@@ -11,6 +11,8 @@ import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
 import { renderReport } from './cli-render.js';
 import { TOOL_VERSION } from './version.js';
+import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
+import path from 'node:path';
 
 export type CliResult = {
   exitCode: number;
@@ -23,6 +25,8 @@ export type CliCommands = {
   runFixSafe: typeof defaultRunFixSafe;
   latestReport: typeof defaultLatestReport;
   validateRestoreBackup: typeof defaultValidateRestoreBackup;
+  pruneReports: typeof defaultPruneReports;
+  pruneBackups: typeof defaultPruneBackups;
 };
 
 export type CliRuntimeOptions = {
@@ -40,12 +44,22 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     runFixSafe: defaultRunFixSafe,
     latestReport: defaultLatestReport,
     validateRestoreBackup: defaultValidateRestoreBackup,
+    pruneReports: defaultPruneReports,
+    pruneBackups: defaultPruneBackups,
     ...runtime.commands
   };
   const io = normalizeCliIo(runtime.io);
   const env = runtime.env ?? process.env;
   const waitTimeoutError = invalidWaitTimeoutError(parsed.args);
   if (waitTimeoutError) return { exitCode: 2, output: waitTimeoutError };
+  if (parsed.noCommand) {
+    const flagError = unknownFlagError(
+      parsed.args,
+      new Set(['--wait', '--wait-timeout', '--no-interactive', '--no-banner', '--plain']),
+      'doctor'
+    );
+    if (flagError) return { exitCode: 2, output: flagError };
+  }
 
   if (parsed.command === 'logo') {
     const flagError = unknownFlagError(parsed.args, new Set(['--plain']), 'logo');
@@ -73,14 +87,18 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
       sleep: runtime.sleep ?? sleep,
       now: runtime.now ?? Date.now,
       commands: {
-        runDoctor: async () => commands.runDoctor(),
+        runDoctor: async (options) => commands.runDoctor(options),
         runFixSafe: async () => commands.runFixSafe()
       }
     });
   }
 
   if (parsed.command === 'doctor') {
-    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--show-paths', '--no-banner', '--no-interactive', '--plain']), 'doctor');
+    const flagError = unknownFlagError(
+      parsed.args,
+      new Set(['--json', '--show-paths', '--no-banner', '--no-interactive', '--plain', '--wait-timeout']),
+      'doctor'
+    );
     if (flagError) return { exitCode: 2, output: flagError };
     const { report, reportPath } = await commands.runDoctor({ json: parsed.json, showPaths: parsed.showPaths });
     const outputReport = sanitizeReportForOutput(report);
@@ -117,7 +135,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     if (!latest) return { exitCode: 1, output: 'No report found.\n' };
     const includePath = parsed.args.includes('--show-paths');
     const payload = latest.report;
-    const pathLine = includePath ? `Report: ${redactPath(latest.path)}\n` : '';
+    const pathLine = includePath ? `Report: ${latest.path}\n` : '';
     return { exitCode: 0, output: includePath ? `${pathLine}${JSON.stringify(payload, null, 2)}\n` : renderReport(latest.report, latest.path) };
   }
 
@@ -130,10 +148,33 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     return { exitCode: result.valid ? 0 : 3, output: `${JSON.stringify(result, null, 2)}\n` };
   }
 
+  if (parsed.command === 'reports' && parsed.args[0] === 'prune') {
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes']), 'reports prune');
+    if (flagError) return { exitCode: 2, output: flagError };
+    if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
+    const result = await commands.pruneReports(path.join(appDataHome(), 'reports'));
+    return { exitCode: result.warnings.length > 0 ? 3 : 0, output: renderPruneResult('reports', result) };
+  }
+
+  if (parsed.command === 'backups' && parsed.args[0] === 'prune') {
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes']), 'backups prune');
+    if (flagError) return { exitCode: 2, output: flagError };
+    if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
+    const result = await commands.pruneBackups(path.join(appDataHome(), 'backups'));
+    return { exitCode: result.warnings.length > 0 ? 3 : 0, output: renderPruneResult('backups', result) };
+  }
+
   return {
     exitCode: 2,
     output: usageText()
   };
+}
+
+function renderPruneResult(kind: 'reports' | 'backups', result: { deleted: number; warnings: string[] }): string {
+  const label = kind === 'reports' ? 'Deleted reports' : 'Deleted backups';
+  const lines = [`${label.padEnd(17, ' ')}${result.deleted}`];
+  for (const warning of result.warnings) lines.push(`Warning          ${warning}`);
+  return `${lines.join('\n')}\n`;
 }
 
 export function fixSafeConfirmationError(args: string[]): string | undefined {

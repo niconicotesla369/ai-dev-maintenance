@@ -41,13 +41,14 @@ describe('aggregate read-only doctor', () => {
 
     expect(output).toContain('AI tools        3 detected');
     expect(output).toContain('Total state     67 B');
-    expect(output).toContain('Safe reclaimable20 B');
+    expect(output).toContain('Safe reclaimable 20 B');
     expect(output).toContain('Private/danger  31 B (never auto-touched)');
     expect(output).toContain('Codex           7 B');
     expect(output).toContain('Claude Code     21 B');
     expect(output).toContain('Cursor          39 B');
     expect(output).toContain('state.vscdb');
     expect(output).toContain('never');
+    expect(output).not.toContain('Safe reclaimable20 B');
     expect(output).not.toContain('Fix readiness');
   });
 

@@ -37,7 +37,8 @@ export function renderReport(report: MaintenanceReport, reportPath?: string, sho
 }
 
 export function row(label: string, value: string): string {
-  return `${label.padEnd(16, ' ')}${value}`;
+  const padded = label.padEnd(16, ' ');
+  return `${padded}${padded.endsWith(' ') ? '' : ' '}${value}`;
 }
 
 export function formatMiB(bytes: number): string {

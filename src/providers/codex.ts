@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { trustedCommandPath, runCommand } from '../commands.js';
+import { scanPathSize } from '../fs-size.js';
 import { detectTargetState, pathExists, safeTargetStateForReport } from '../fs-safety.js';
 import { defaultCodexHome, redactPath, targetTriple } from '../paths.js';
 import { writeReport } from '../reports.js';
@@ -7,16 +8,53 @@ import { classifyLsofResult, deriveFixReadiness, parseKnownCodexProcess } from '
 import { checkSqliteJsonSupport } from '../sqlite.js';
 import type { MaintenanceReport } from '../types.js';
 import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from '../version.js';
-import type { MaintenanceProvider } from './types.js';
+import type { MaintenanceProvider, ProviderDoctorOptions, ProviderRuntimeOptions, StateEntry } from './types.js';
 
-export const codexProvider: MaintenanceProvider = {
+export const codexProvider = {
   id: 'codex',
   displayName: 'Codex',
   defaultPathCategory: '<home>/.codex/logs_2.sqlite',
+  detect: detectCodex,
+  scan: scanCodex,
+  advisories: codexAdvisories,
   runDoctor: runCodexDoctor
-};
+} satisfies MaintenanceProvider;
 
-async function runCodexDoctor(options: Parameters<MaintenanceProvider['runDoctor']>[0]) {
+async function detectCodex(options: ProviderRuntimeOptions = {}) {
+  const { codexHome, custom } = defaultCodexHome(options.env);
+  return {
+    present: await pathExists(codexHome),
+    roots: [custom ? 'custom-codex-home' : '<home>/.codex']
+  };
+}
+
+async function scanCodex(options: ProviderRuntimeOptions = {}): Promise<StateEntry[]> {
+  const { codexHome, custom } = defaultCodexHome(options.env);
+  const mainPath = path.join(codexHome, 'logs_2.sqlite');
+  const pathCategory = custom ? 'custom-codex-home/logs_2.sqlite' : codexProvider.defaultPathCategory;
+  const scan = await scanPathSize(mainPath, pathCategory);
+  if (!scan.exists) return [];
+  return [{
+    category: 'log',
+    pathCategory,
+    bytes: scan.bytes,
+    reclaimability: 'confirm',
+    note: 'Codex log database diagnostic only; v0.2.0 does not stop writes.',
+    sizeTruncated: scan.sizeTruncated,
+    warnings: scan.warnings
+  }];
+}
+
+async function codexAdvisories(): Promise<Awaited<ReturnType<MaintenanceProvider['advisories']>>> {
+  return [{
+    severity: 'warn',
+    code: 'codex-ssd-log-write-volume',
+    message: 'AIDM can diagnose Codex log size, but it does not stop high-frequency writes.',
+    nextAction: 'Update Codex to a version with the upstream log-volume reduction.'
+  }];
+}
+
+async function runCodexDoctor(options: ProviderDoctorOptions) {
   const platform = options.platform ?? process.platform;
   if (platform !== 'darwin') {
     const report = baseReport('doctor', options.generatedAt, 'unsupported');

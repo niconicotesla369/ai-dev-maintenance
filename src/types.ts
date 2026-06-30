@@ -68,19 +68,62 @@ export type TargetState = {
 
 export type ReportStatus = 'ok' | 'partial' | 'blocked' | 'unsupported' | 'error';
 
+export type StateCategory = 'session' | 'log' | 'cache' | 'model' | 'index' | 'appdb' | 'sidecar';
+export type Reclaimability = 'never' | 'safe' | 'confirm';
+
+export type StateEntry = {
+  category: StateCategory;
+  pathCategory: string;
+  bytes: number;
+  reclaimability: Reclaimability;
+  note?: string;
+  sizeTruncated?: boolean;
+  warnings?: Array<Record<string, unknown>>;
+};
+
+export type Advisory = {
+  severity: 'info' | 'warn' | 'critical';
+  code: string;
+  message: string;
+  nextAction?: string;
+};
+
+export type ProviderReport = {
+  id: string;
+  displayName: string;
+  present: boolean;
+  totalBytes: number;
+  buckets: {
+    safeReclaimableBytes: number;
+    confirmBytes: number;
+    privateBytes: number;
+  };
+  entries: StateEntry[];
+  advisories: Advisory[];
+};
+
+export type MaintenanceTotals = {
+  totalBytes: number;
+  safeReclaimableBytes: number;
+  confirmBytes: number;
+  privateBytes: number;
+};
+
 export type MaintenanceReport = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   toolVersion: string;
   generatedAt: string;
   command: string;
   status: ReportStatus;
   redacted: true;
   target: {
-    kind: 'default-codex-log-db' | 'unknown';
+    kind: 'default-codex-log-db' | 'aggregate-ai-tools' | 'unknown';
     pathCategory: string;
   };
   findings: Record<string, unknown>;
   metrics: Record<string, unknown>;
   blockedReasons: string[];
   nextSafeAction?: string;
+  providers?: ProviderReport[];
+  totals?: MaintenanceTotals;
 };

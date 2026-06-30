@@ -9,6 +9,9 @@ export type RenderReportOptions = {
 };
 
 export function renderReport(report: MaintenanceReport, reportPath?: string, showPaths = false, options: RenderReportOptions = {}): string {
+  if (report.schemaVersion === 2 && Array.isArray(report.providers)) {
+    return renderAggregateReport(report, reportPath, showPaths, options);
+  }
   const readiness = report.command === 'doctor' ? deriveFixReadiness(report) : undefined;
   const lines: string[] = [];
   if (options.banner) lines.push(bannerText().trimEnd(), '');
@@ -39,6 +42,13 @@ export function row(label: string, value: string): string {
 
 export function formatMiB(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+}
+
+export function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GiB`;
 }
 
 export function targetSizeRows(report: MaintenanceReport): string[] {
@@ -95,4 +105,61 @@ function nextAction(report: MaintenanceReport, ready: boolean): string | undefin
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function renderAggregateReport(
+  report: MaintenanceReport,
+  reportPath?: string,
+  showPaths = false,
+  options: RenderReportOptions = {}
+): string {
+  const lines: string[] = [];
+  if (options.banner) lines.push(bannerText().trimEnd(), '');
+  lines.push(row('Diagnosis', diagnosisLabel(report)));
+  const providers = report.providers ?? [];
+  const detected = providers.filter((provider) => provider.present).length;
+  const totals = report.totals ?? {
+    totalBytes: providers.reduce((sum, provider) => sum + provider.totalBytes, 0),
+    safeReclaimableBytes: providers.reduce((sum, provider) => sum + provider.buckets.safeReclaimableBytes, 0),
+    confirmBytes: providers.reduce((sum, provider) => sum + provider.buckets.confirmBytes, 0),
+    privateBytes: providers.reduce((sum, provider) => sum + provider.buckets.privateBytes, 0)
+  };
+  lines.push(row('AI tools', `${detected} detected`));
+  lines.push(row('Total state', formatBytes(totals.totalBytes)));
+  lines.push(row('Safe reclaimable', formatBytes(totals.safeReclaimableBytes)));
+  lines.push(row('Review first', formatBytes(totals.confirmBytes)));
+  lines.push(row('Private/danger', `${formatBytes(totals.privateBytes)} (never auto-touched)`));
+  lines.push(row('Changed', whatChanged(report)));
+
+  for (const provider of providers) {
+    if (!provider.present && provider.entries.length === 0) continue;
+    lines.push('');
+    lines.push(row(provider.displayName, formatBytes(provider.totalBytes)));
+    for (const advisory of provider.advisories) {
+      lines.push(row('Advisory', `${advisory.severity}: ${advisory.message}`));
+      if (advisory.nextAction) lines.push(row('Next', advisory.nextAction));
+    }
+    for (const entry of provider.entries) {
+      const suffix = entry.reclaimability === 'never'
+        ? 'never'
+        : entry.reclaimability === 'safe'
+          ? 'safe'
+          : 'review';
+      lines.push(row(entryLabel(entry.pathCategory), `${formatBytes(entry.bytes)} ${suffix}`));
+    }
+  }
+
+  if (reportPath) {
+    const reportLocation = showPaths ? reportPath : redactPath(reportPath);
+    lines.push('', row('Report', reportLocation));
+    lines.push(row('Review', `npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest`));
+  }
+  if (report.nextSafeAction) lines.push(row('Next', report.nextSafeAction));
+  return `${lines.join('\n')}\n`;
+}
+
+function entryLabel(pathCategory: string): string {
+  const normalized = pathCategory.replaceAll('\\', '/');
+  if (normalized.endsWith('state.vscdb.backup')) return 'state.vscdb.bak';
+  return normalized.split('/').filter(Boolean).at(-1) ?? pathCategory;
 }

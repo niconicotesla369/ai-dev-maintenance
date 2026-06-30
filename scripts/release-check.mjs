@@ -38,13 +38,16 @@ async function assertDistSafetyMarkers() {
 
 async function assertVersionSync(packageJson) {
   const versionSource = await readFile('src/version.ts', 'utf8');
-  const sample = await readFile('examples/sample-report.json', 'utf8');
+  const sample = JSON.parse(await readFile('examples/sample-report.json', 'utf8'));
   const readme = await readFile('README.md', 'utf8');
   if (!versionSource.includes(`TOOL_VERSION = '${packageJson.version}'`)) {
     failures.push('src/version.ts TOOL_VERSION must match package.json version');
   }
-  if (JSON.parse(sample).toolVersion !== packageJson.version) {
+  if (sample.toolVersion !== packageJson.version) {
     failures.push('sample report toolVersion must match package.json version');
+  }
+  if (sample.schemaVersion !== 2 || !Array.isArray(sample.providers) || !sample.totals) {
+    failures.push('sample report must use schema v2 aggregate provider shape');
   }
   if (!readme.includes(`ai-dev-maintenance@${packageJson.version}`)) {
     failures.push('README command pin must match package.json version');

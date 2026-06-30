@@ -1,4 +1,4 @@
-import { runDoctor as defaultRunDoctor } from './doctor.js';
+import { runCodexDoctor as defaultRunCodexDoctor, runDoctor as defaultRunDoctor } from './doctor.js';
 import { runFixSafe as defaultRunFixSafe } from './fix.js';
 import { appDataHome, redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
@@ -75,6 +75,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   }
 
   if (shouldUseGuidedMode(parsed, env, io)) {
+    const runGuidedDoctor = runtime.commands?.runDoctor ?? defaultRunCodexDoctor;
     return runGuidedCli({
       io,
       wait: parsed.wait,
@@ -87,7 +88,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
       sleep: runtime.sleep ?? sleep,
       now: runtime.now ?? Date.now,
       commands: {
-        runDoctor: async (options) => commands.runDoctor(options),
+        runDoctor: async (options) => runGuidedDoctor(options),
         runFixSafe: async () => commands.runFixSafe()
       }
     });

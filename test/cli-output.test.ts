@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { renderReport, shouldShowBanner } from '../src/cli.js';
-import { runDoctor } from '../src/doctor.js';
+import { runCodexDoctor } from '../src/doctor.js';
 import type { MaintenanceReport } from '../src/types.js';
 
 const tempDirs: string[] = [];
@@ -118,7 +118,7 @@ describe('doctor fix readiness report field', () => {
     const codexHome = await mkdtemp(path.join(os.tmpdir(), 'ai-dev-maintenance-codex-home-'));
     tempDirs.push(codexHome);
 
-    const { report } = await runDoctor({
+    const { report } = await runCodexDoctor({
       platform: 'darwin',
       env: { ...process.env, CODEX_HOME: codexHome }
     });

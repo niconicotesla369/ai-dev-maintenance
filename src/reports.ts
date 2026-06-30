@@ -53,14 +53,14 @@ export async function latestReport(): Promise<{ path: string; report: Maintenanc
 
 export function sanitizeReportForOutput(report: MaintenanceReport): MaintenanceReport {
   return {
-    schemaVersion: 1,
+    schemaVersion: report.schemaVersion === 2 ? 2 : 1,
     toolVersion: sanitizeString(report.toolVersion),
     generatedAt: sanitizeString(report.generatedAt),
     command: sanitizeString(report.command),
     status: report.status,
     redacted: true,
     target: {
-      kind: report.target?.kind === 'default-codex-log-db' ? 'default-codex-log-db' : 'unknown',
+      kind: sanitizeTargetKind(report.target?.kind),
       pathCategory: sanitizeString(report.target?.pathCategory ?? 'unknown')
     },
     findings: sanitizeRecord(report.findings),
@@ -68,7 +68,9 @@ export function sanitizeReportForOutput(report: MaintenanceReport): MaintenanceR
     blockedReasons: Array.isArray(report.blockedReasons)
       ? report.blockedReasons.map((reason) => sanitizeString(String(reason)))
       : [],
-    nextSafeAction: report.nextSafeAction ? sanitizeString(report.nextSafeAction) : undefined
+    nextSafeAction: report.nextSafeAction ? sanitizeString(report.nextSafeAction) : undefined,
+    providers: sanitizeProviders(report.providers),
+    totals: sanitizeTotals(report.totals)
   };
 }
 
@@ -102,6 +104,23 @@ function sanitizeString(value: string): string {
 
 function sanitizeReportKey(key: string): string {
   return redactPath(key);
+}
+
+function sanitizeTargetKind(kind: unknown): MaintenanceReport['target']['kind'] {
+  if (kind === 'default-codex-log-db') return 'default-codex-log-db';
+  if (kind === 'aggregate-ai-tools') return 'aggregate-ai-tools';
+  return 'unknown';
+}
+
+function sanitizeProviders(providers: unknown): MaintenanceReport['providers'] {
+  if (!Array.isArray(providers)) return undefined;
+  const sanitized = sanitizeJsonValue(providers);
+  return Array.isArray(sanitized) ? sanitized as MaintenanceReport['providers'] : undefined;
+}
+
+function sanitizeTotals(totals: unknown): MaintenanceReport['totals'] {
+  const sanitized = sanitizeJsonValue(totals);
+  return isPlainObject(sanitized) ? sanitized as MaintenanceReport['totals'] : undefined;
 }
 
 function isForbiddenReportKey(key: string): boolean {

@@ -1,10 +1,7 @@
-import type { MaintenanceReport } from '../types.js';
-import type { SizeScanWarning } from '../fs-size.js';
+import type { Advisory, MaintenanceReport, Reclaimability, StateCategory, StateEntry } from '../types.js';
 
 export type MaintenanceProviderId = 'codex' | 'claude-code' | 'cursor' | (string & {});
-
-export type StateCategory = 'session' | 'log' | 'cache' | 'model' | 'index' | 'appdb' | 'sidecar';
-export type Reclaimability = 'never' | 'safe' | 'confirm';
+export type { Advisory, Reclaimability, StateCategory, StateEntry };
 
 export type ProviderRuntimeOptions = {
   platform?: NodeJS.Platform;
@@ -14,23 +11,6 @@ export type ProviderRuntimeOptions = {
 export type ProviderDetection = {
   present: boolean;
   roots: string[];
-};
-
-export type StateEntry = {
-  category: StateCategory;
-  pathCategory: string;
-  bytes: number;
-  reclaimability: Reclaimability;
-  note?: string;
-  sizeTruncated?: boolean;
-  warnings?: SizeScanWarning[];
-};
-
-export type Advisory = {
-  severity: 'info' | 'warn' | 'critical';
-  code: string;
-  message: string;
-  nextAction?: string;
 };
 
 export type ProviderDoctorOptions = {

@@ -1,30 +1,115 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "toolVersion": "0.1.5",
   "generatedAt": "2026-06-25T00:00:00.000Z",
-  "command": "fix --safe",
+  "command": "doctor",
   "status": "ok",
   "redacted": true,
   "target": {
-    "kind": "default-codex-log-db",
-    "pathCategory": "<home>/.codex/logs_2.sqlite"
+    "kind": "aggregate-ai-tools",
+    "pathCategory": "ai-tools"
   },
-  "findings": {
-    "sqliteJson": {
-      "ok": true
-    },
-    "openHandles": {
-      "usable": true,
-      "openHandles": false,
-      "reason": "no open handles reported"
-    }
-  },
-  "metrics": {
-    "beforeWalBytes": 52428800,
-    "afterWalBytes": 0,
-    "reclaimedBytes": 52428800,
-    "mainDbForcedShrink": false
-  },
+  "findings": {},
+  "metrics": {},
   "blockedReasons": [],
-  "nextSafeAction": "Review the before/after metrics in the saved report."
+  "nextSafeAction": "Review provider buckets. v0.2.0 doctor is read-only and does not clean multi-tool state.",
+  "providers": [
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "present": true,
+      "totalBytes": 7340032,
+      "buckets": {
+        "safeReclaimableBytes": 0,
+        "confirmBytes": 7340032,
+        "privateBytes": 0
+      },
+      "entries": [
+        {
+          "category": "log",
+          "pathCategory": "<home>/.codex/logs_2.sqlite",
+          "bytes": 7340032,
+          "reclaimability": "confirm",
+          "note": "Codex log database diagnostic only; v0.2.0 does not stop writes."
+        }
+      ],
+      "advisories": [
+        {
+          "severity": "warn",
+          "code": "codex-ssd-log-write-volume",
+          "message": "AIDM can diagnose Codex log size, but it does not stop high-frequency writes.",
+          "nextAction": "Update Codex to a version with the upstream log-volume reduction."
+        }
+      ]
+    },
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "present": true,
+      "totalBytes": 20971520,
+      "buckets": {
+        "safeReclaimableBytes": 1048576,
+        "confirmBytes": 0,
+        "privateBytes": 19922944
+      },
+      "entries": [
+        {
+          "category": "session",
+          "pathCategory": "<home>/.claude/projects",
+          "bytes": 19922944,
+          "reclaimability": "never",
+          "note": "private conversation history; never touched"
+        },
+        {
+          "category": "log",
+          "pathCategory": "<home>/.claude/debug",
+          "bytes": 1048576,
+          "reclaimability": "safe",
+          "note": "debug logs; cleanup is not implemented in v0.2.0"
+        }
+      ],
+      "advisories": []
+    },
+    {
+      "id": "cursor",
+      "displayName": "Cursor",
+      "present": true,
+      "totalBytes": 52428800,
+      "buckets": {
+        "safeReclaimableBytes": 4194304,
+        "confirmBytes": 8388608,
+        "privateBytes": 39845888
+      },
+      "entries": [
+        {
+          "category": "appdb",
+          "pathCategory": "<home>/Library/Application Support/Cursor/User/globalStorage/state.vscdb",
+          "bytes": 39845888,
+          "reclaimability": "never",
+          "note": "private conversation and history database; never touched"
+        },
+        {
+          "category": "cache",
+          "pathCategory": "<home>/Library/Application Support/Cursor/Cache",
+          "bytes": 4194304,
+          "reclaimability": "safe",
+          "note": "cache data; cleanup is not implemented in v0.2.0"
+        },
+        {
+          "category": "session",
+          "pathCategory": "<home>/Library/Application Support/Cursor/User/workspaceStorage",
+          "bytes": 8388608,
+          "reclaimability": "confirm",
+          "note": "workspace state can contain project context; manual review required"
+        }
+      ],
+      "advisories": []
+    }
+  ],
+  "totals": {
+    "totalBytes": 80740352,
+    "safeReclaimableBytes": 5242880,
+    "confirmBytes": 15728640,
+    "privateBytes": 59768832
+  }
 }

@@ -42,7 +42,7 @@ describe('human CLI output', () => {
     }));
 
     expect(output).toContain('Fix readiness   ready');
-    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.2.0 -- fix --safe --yes');
+    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.2.2 -- fix --safe --yes');
     expect(output).toContain('Main DB         46.7 MiB');
     expect(output).toContain('WAL             5.2 MiB');
     expect(output).toContain('SHM             1.0 MiB');
@@ -78,7 +78,7 @@ describe('human CLI output', () => {
   test('does not show doctor-only fix readiness on fix reports', () => {
     const output = renderReport({
       schemaVersion: 1,
-      toolVersion: '0.2.0',
+      toolVersion: '0.2.2',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'ok',
@@ -130,16 +130,17 @@ describe('doctor fix readiness report field', () => {
   });
 });
 
-describe('public docs for v0.2.0 UX', () => {
+describe('public docs for v0.2.2 UX', () => {
   test('readmes document the short npx path and pinned safe path', async () => {
     const readmes = [
       await readFile('README.md', 'utf8'),
       await readFile('README.ja.md', 'utf8')
     ].join('\n');
 
-    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.2.0');
-    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.0 -- doctor --show-paths');
+    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.2.2');
+    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- doctor --show-paths');
     expect(readmes).toContain('Codex / Claude Code / Cursor');
+    expect(readmes).toContain('cursor clean --safe --yes');
     expect(readmes).toContain('aidm logo');
     expect(readmes).toContain('target log database is still open');
   });
@@ -148,7 +149,7 @@ describe('public docs for v0.2.0 UX', () => {
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.0',
+    toolVersion: '0.2.2',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.2.0",
+  "toolVersion": "0.2.2",
   "generatedAt": "2026-06-25T00:00:00.000Z",
   "command": "doctor",
   "status": "ok",
@@ -12,7 +12,7 @@
   "findings": {},
   "metrics": {},
   "blockedReasons": [],
-  "nextSafeAction": "Review provider buckets. v0.2.0 doctor is read-only and does not clean multi-tool state.",
+  "nextSafeAction": "Review provider buckets. Use cursor clean --safe to dry-run Cursor cache/log cleanup.",
   "providers": [
     {
       "id": "codex",
@@ -30,7 +30,7 @@
           "pathCategory": "<home>/.codex/logs_2.sqlite",
           "bytes": 7340032,
           "reclaimability": "confirm",
-          "note": "Codex log database diagnostic only; v0.2.0 does not stop writes."
+          "note": "Codex log database diagnostic only; v0.2.2 does not stop writes."
         }
       ],
       "advisories": [
@@ -65,7 +65,7 @@
           "pathCategory": "<home>/.claude/debug",
           "bytes": 1048576,
           "reclaimability": "safe",
-          "note": "debug logs; cleanup is not implemented in v0.2.0"
+          "note": "debug logs; cleanup is not implemented in v0.2.2"
         }
       ],
       "advisories": []
@@ -93,7 +93,7 @@
           "pathCategory": "<home>/Library/Application Support/Cursor/Cache",
           "bytes": 4194304,
           "reclaimability": "safe",
-          "note": "cache data; cleanup is not implemented in v0.2.0"
+          "note": "cache data; safe cleanup is available via cursor clean --safe"
         },
         {
           "category": "session",

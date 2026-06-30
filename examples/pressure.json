@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.2.2",
+  "generatedAt": "2026-06-30T00:00:00.000Z",
+  "command": "pressure",
+  "status": "ok",
+  "redacted": true,
+  "platform": "darwin",
+  "totals": {
+    "aiCpuPercent": 15.3,
+    "aiRssBytes": 1363148800,
+    "processCount": 3
+  },
+  "memory": {
+    "pageSizeBytes": 16384,
+    "freeBytes": 3221225472,
+    "freePercent": 30,
+    "pagesFree": 786432,
+    "pagesUsedByCompressor": 131072,
+    "swapouts": 0
+  },
+  "disk": {
+    "availableBytes": 52613349376,
+    "capacityPercent": 80
+  },
+  "processes": [
+    {
+      "pid": 123,
+      "ppid": 1,
+      "provider": "codex",
+      "category": "app",
+      "cpuPercent": 10,
+      "memPercent": 7.5,
+      "rssBytes": 629145600,
+      "commandSummary": "Codex.app"
+    }
+  ],
+  "warnings": [],
+  "nextActions": [
+    "No urgent pressure action detected."
+  ]
+}

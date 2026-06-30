@@ -45,28 +45,28 @@ async function scanCursor(options: ProviderRuntimeOptions = {}): Promise<StateEn
       `${CURSOR_ROOT_CATEGORY}/Cache`,
       'cache',
       'safe',
-      'cache data; cleanup is not implemented in v0.2.0'
+      'cache data; safe cleanup is available via cursor clean --safe'
     ),
     entrySpec(
       path.join(root, 'CachedData'),
       `${CURSOR_ROOT_CATEGORY}/CachedData`,
       'cache',
       'safe',
-      'cached runtime data; cleanup is not implemented in v0.2.0'
+      'cached runtime data; safe cleanup is available via cursor clean --safe'
     ),
     entrySpec(
       path.join(root, 'CachedExtensionVSIXs'),
       `${CURSOR_ROOT_CATEGORY}/CachedExtensionVSIXs`,
       'cache',
       'safe',
-      'extension cache; cleanup is not implemented in v0.2.0'
+      'extension cache; safe cleanup is available via cursor clean --safe'
     ),
     entrySpec(
       path.join(root, 'logs'),
       `${CURSOR_ROOT_CATEGORY}/logs`,
       'log',
       'safe',
-      'logs; cleanup is not implemented in v0.2.0'
+      'logs; safe cleanup is available via cursor clean --safe'
     ),
     entrySpec(
       path.join(root, 'User', 'workspaceStorage'),

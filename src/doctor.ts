@@ -46,7 +46,7 @@ export async function runDoctor(options: {
     confirmBytes: providers.reduce((sum, provider) => sum + provider.buckets.confirmBytes, 0),
     privateBytes: providers.reduce((sum, provider) => sum + provider.buckets.privateBytes, 0)
   };
-  report.nextSafeAction = 'Review provider buckets. v0.2.0 doctor is read-only and does not clean multi-tool state.';
+  report.nextSafeAction = 'Review provider buckets. Use cursor clean --safe to dry-run Cursor cache/log cleanup.';
 
   const reportPath = options.persistReport === false ? undefined : await writeReport(report);
   return { report, reportPath };

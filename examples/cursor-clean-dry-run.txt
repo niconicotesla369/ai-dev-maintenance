@@ -1,0 +1,6 @@
+Cursor cleanup  ready
+Mode            dry run
+Reclaimable     339.0 MiB
+Targets         4
+Changed         nothing; dry run only
+Next            ai-dev-maintenance cursor clean --safe --yes

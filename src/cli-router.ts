@@ -1,5 +1,8 @@
 import { runCodexDoctor as defaultRunCodexDoctor, runDoctor as defaultRunDoctor } from './doctor.js';
 import { runFixSafe as defaultRunFixSafe } from './fix.js';
+import { runCursorSafeCleanup as defaultRunCursorSafeCleanup } from './cursor-clean.js';
+import { runPressureDoctor as defaultRunPressureDoctor } from './pressure/doctor.js';
+import { renderPressureReport } from './pressure/render.js';
 import { appDataHome, redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup as defaultValidateRestoreBackup } from './restore.js';
@@ -10,6 +13,7 @@ import type { CliIo } from './cli-io.js';
 import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
 import { renderReport } from './cli-render.js';
+import { formatBytes, row } from './cli-render.js';
 import { TOOL_VERSION } from './version.js';
 import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
 import path from 'node:path';
@@ -27,6 +31,8 @@ export type CliCommands = {
   validateRestoreBackup: typeof defaultValidateRestoreBackup;
   pruneReports: typeof defaultPruneReports;
   pruneBackups: typeof defaultPruneBackups;
+  runCursorSafeCleanup: typeof defaultRunCursorSafeCleanup;
+  runPressureDoctor: typeof defaultRunPressureDoctor;
 };
 
 export type CliRuntimeOptions = {
@@ -46,6 +52,8 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     validateRestoreBackup: defaultValidateRestoreBackup,
     pruneReports: defaultPruneReports,
     pruneBackups: defaultPruneBackups,
+    runCursorSafeCleanup: defaultRunCursorSafeCleanup,
+    runPressureDoctor: defaultRunPressureDoctor,
     ...runtime.commands
   };
   const io = normalizeCliIo(runtime.io);
@@ -126,6 +134,24 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     return { exitCode, output: renderReport(outputReport, reportPath, parsed.showPaths) };
   }
 
+  if (parsed.command === 'cursor' && parsed.args[0] === 'clean' && parsed.args.includes('--safe')) {
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--safe', '--yes']), 'cursor clean');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const result = await commands.runCursorSafeCleanup({ env, yes: parsed.args.includes('--yes') });
+    const exitCode = result.status === 'blocked' ? 3 : 0;
+    return { exitCode, output: renderCursorCleanupResult(result) };
+  }
+
+  if (parsed.command === 'pressure') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--no-banner', '--plain']), 'pressure');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const report = await commands.runPressureDoctor();
+    return {
+      exitCode: report.status === 'unsupported' ? 2 : 0,
+      output: parsed.json ? `${JSON.stringify(report, null, 2)}\n` : renderPressureReport(report)
+    };
+  }
+
   if (parsed.command === 'report' && parsed.args.includes('--latest')) {
     const flagError = unknownFlagError(parsed.args, new Set(['--latest', '--show-paths', '--unredacted']), 'report');
     if (flagError) return { exitCode: 2, output: flagError };
@@ -169,6 +195,22 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     exitCode: 2,
     output: usageText()
   };
+}
+
+function renderCursorCleanupResult(result: Awaited<ReturnType<typeof defaultRunCursorSafeCleanup>>): string {
+  const lines = [
+    row('Cursor cleanup', result.status),
+    row('Mode', result.mode === 'dry-run' ? 'dry run' : 'cleanup'),
+    row(result.mode === 'cleanup' ? 'Reclaimed' : 'Reclaimable', formatBytes(result.mode === 'cleanup' ? result.deletedBytes : result.reclaimableBytes)),
+    row('Targets', String(result.targets.length)),
+    row('Changed', result.mode === 'cleanup' ? 'Cursor cache/log contents removed' : 'nothing; dry run only')
+  ];
+  for (const reason of result.blockedReasons) lines.push(row('Reason', reason));
+  for (const warning of result.warnings) lines.push(row('Warning', warning));
+  if (result.mode === 'dry-run' && result.status === 'ready' && result.reclaimableBytes > 0) {
+    lines.push(row('Next', 'ai-dev-maintenance cursor clean --safe --yes'));
+  }
+  return `${lines.join('\n')}\n`;
 }
 
 function renderPruneResult(kind: 'reports' | 'backups', result: { deleted: number; warnings: string[] }): string {

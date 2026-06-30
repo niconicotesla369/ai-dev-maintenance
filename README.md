@@ -1,32 +1,34 @@
 # ai-dev-maintenance
 
-Safely diagnose and reclaim local disk usage created by AI coding tool state.
+Safely diagnose local disk usage created by AI coding tool state.
 
-The first release is intentionally small. It focuses on macOS, redacted reports, and safe reclaim of a Codex SQLite log database WAL file.
+v0.2.0 adds a read-only multi-tool doctor for Codex, Claude Code, and Cursor. It shows total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
-`doctor` only writes a local redacted report. `fix --safe --yes` creates a private local backup that may contain Codex log data, then truncates SQLite WAL storage. It does not upload data, print log contents, delete logs, rewrite session history, install database triggers, or change tool configuration.
+`doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
+
+The existing Codex-only `fix --safe --yes` path remains available for SQLite WAL checkpoint/truncate. It creates a private local backup that may contain Codex log data before touching the Codex log database.
 
 ## Quick Start
 
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.1.5
+npx --yes ai-dev-maintenance@0.2.0
 ```
 
-In a normal terminal this starts a guided flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
-v0.1.5 fixes the v0.1.4 liveness false-blockers, keeps Codex-like process names advisory-only, and adds report/backup retention.
+In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
+v0.2.0 also makes `doctor` a read-only multi-tool report for Codex, Claude Code, and Cursor.
 
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.5 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.0 -- doctor --show-paths
 ```
 
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.1.5
+npm install -g ai-dev-maintenance@0.2.0
 aidm
 ```
 
@@ -37,19 +39,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.5 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.0 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.5 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.0 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.1.5 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.0 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -82,8 +84,10 @@ Use `aidm logo` to print only the banner for screenshots or terminal checks. It 
 ## Safety Guarantees
 
 - `doctor` does not open the source database as a SQLite connection.
+- `doctor` does not read Claude Code or Cursor session contents.
 - `doctor` writes a redacted local report under the tool data directory.
-- `doctor` skips SQLite content inspection in v0.1.x to avoid copying private log database bytes.
+- `doctor` classifies Claude Code `projects` and Cursor `state.vscdb` as private/danger and never auto-touched.
+- `doctor` skips SQLite content inspection to avoid copying private log database bytes.
 - `fix --safe --yes` targets only the default Codex `logs_2.sqlite` database and its SQLite sidecar files.
 - Codex-like process names are advisory only; `fix --safe` blocks when any process has the target database open or open-handle checks are unavailable.
 - SQLite commands use safe SQLite file URLs instead of passing plain database paths.
@@ -124,16 +128,18 @@ The saved report includes:
 - `reclaimedBytes`
 - `nextSafeAction`
 
-See `examples/sample-report.json` for a redacted example.
-Human output examples are available in `examples/logo.txt`, `examples/doctor-blocked.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
+See `examples/sample-report.json` for a schema v2 redacted multi-tool example.
+Human output examples are available in `examples/logo.txt`, `examples/doctor-aggregate.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
 
 Redacted reports keep high-level target categories, existence flags, file sizes, command status, and reclaim metrics. They remove raw local-machine identifiers, raw command output, and absolute local paths. `--show-paths` affects human output only and never changes the saved redacted report.
 
 Human-readable output includes:
 
-- whether `fix --safe` is ready or blocked;
-- the reason it is blocked, if any;
-- main database and WAL sizes in MiB;
+- detected AI tools;
+- total local AI tool state;
+- safe-looking cache/log buckets;
+- review-first buckets;
+- private/danger buckets that are never auto-touched;
 - what changed in the current command;
 - the next command to run.
 
@@ -149,7 +155,7 @@ This only validates a backup. Do not move, copy, or replace database files unles
 
 ## Platform Support
 
-v0.1.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
+v0.2.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
 
 ## Development
 

@@ -1,0 +1,29 @@
+Diagnosis       complete
+AI tools        3 detected
+Total state     941.3 MiB
+Safe reclaimable 339.0 MiB
+Review first    54.7 MiB
+Private/danger  547.7 MiB (never auto-touched)
+Changed         redacted report only
+
+Codex           46.7 MiB
+Advisory        warn: AIDM can diagnose Codex log size, but it does not stop high-frequency writes.
+Next            Update Codex to a version with the upstream log-volume reduction.
+logs_2.sqlite   46.7 MiB review
+
+Claude Code     112.1 MiB
+projects        112.1 MiB never
+debug           0 B safe
+settings.json   479 B never
+
+Cursor          782.5 MiB
+state.vscdb     217.9 MiB never
+state.vscdb.bak 217.6 MiB never
+Cache           152.4 MiB safe
+CachedData      89.9 MiB safe
+logs            96.7 MiB safe
+workspaceStorage 8.0 MiB review
+
+Report          <home>/.ai-dev-maintenance/reports/report-2026-06-30T00-00-00-000Z.json
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.0 -- report --latest
+Next            Review provider buckets. v0.2.0 doctor is read-only and does not clean multi-tool state.

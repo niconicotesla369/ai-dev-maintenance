@@ -85,7 +85,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.5',
+      toolVersion: '0.2.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -110,7 +110,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.1.5 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.0 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -127,7 +127,7 @@ describe('release readiness', () => {
           path: latestPath,
           report: {
             schemaVersion: 1,
-            toolVersion: '0.1.5',
+            toolVersion: '0.2.0',
             generatedAt: '2026-01-01T00:00:00.000Z',
             command: 'doctor',
             status: 'ok',
@@ -158,7 +158,7 @@ describe('release readiness', () => {
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.5',
+      toolVersion: '0.2.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -189,7 +189,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.1.5');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.2.0');
     expect(readme).toContain('aidm');
   });
 
@@ -245,7 +245,7 @@ describe('release readiness', () => {
           return {
             report: {
               schemaVersion: 1,
-              toolVersion: '0.1.5',
+              toolVersion: '0.2.0',
               generatedAt: '2026-01-01T00:00:00.000Z',
               command: 'doctor',
               status: 'ok',
@@ -269,7 +269,7 @@ describe('release readiness', () => {
   test('supports equals wait timeout and rejects command-looking timeout values', async () => {
     const doctorReport: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.1.5',
+      toolVersion: '0.2.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',

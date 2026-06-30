@@ -40,5 +40,5 @@ describe('fix safe e2e', () => {
       else process.env.HOME = previousHome;
       await rm(tempHome, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });

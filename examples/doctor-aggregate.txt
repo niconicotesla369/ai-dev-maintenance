@@ -25,5 +25,5 @@ logs            96.7 MiB safe
 workspaceStorage 8.0 MiB review
 
 Report          <home>/.ai-dev-maintenance/reports/report-2026-06-30T00-00-00-000Z.json
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.3 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.4 -- report --latest
 Next            Review provider buckets. Use cursor clean --safe to dry-run Cursor cache/log cleanup.

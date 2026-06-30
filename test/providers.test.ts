@@ -8,7 +8,7 @@ import { cursorProvider } from '../src/providers/cursor.js';
 import { getProvider, listProviders } from '../src/providers/registry.js';
 
 describe('maintenance provider registry', () => {
-  test('registers the v0.2.3 provider set', () => {
+  test('registers the v0.2.4 provider set', () => {
     const providers = listProviders();
 
     expect(providers.map((provider) => provider.id)).toEqual(['codex', 'claude-code', 'cursor']);

@@ -1,19 +1,26 @@
-Live pressure   ok
-Memory free     3.0 GiB
-Pressure level  medium
-Reason          disk usage is elevated
-Disk used       80%
-AI CPU          15.3%
-AI RSS          1.3 GiB
-Processes       3
+╭─ AIDM SYSTEM PULSE ─────────────────────────────────────────────────────────╮
+│ ✓ Live pressure: OK    Captured 00:00                                      │
+│                                                                            │
+│ Memory free     3.0 GiB       OK        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ Disk used       80%           ELEVATED  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱             │
+│ AI CPU          15.3%         OK        ▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ AI RSS          1.3 GiB       BUSY      ▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱             │
+│ Processes       3             OK        ▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+╰────────────────────────────────────────────────────────────────────────────╯
 
-Top CPU         
-Codex           10.0% app pid=123
-Cursor ExtHost  3.5% extension-host pid=456
-Claude          1.8% terminal pid=789
+╭─ What is using CPU? ─────────────────╮
+│  1  Codex               10.0%       app             pid 123                │
+│  2  Cursor ExtHost      3.5%        extension-host  pid 456                │
+│  3  Claude              1.8%        terminal        pid 789                │
+╰────────────────────────────────────────────────────────────────────────────╯
 
-Top RAM         
-Codex           600.0 MiB app pid=123
-Cursor ExtHost  500.0 MiB extension-host pid=456
-Claude          200.0 MiB terminal pid=789
-Next            No urgent pressure action detected.
+╭─ What is using RAM? ─────────────────╮
+│  1  Codex               600.0 MiB   app             pid 123                │
+│  2  Cursor ExtHost      500.0 MiB   extension-host  pid 456                │
+│  3  Claude              200.0 MiB   terminal        pid 789                │
+╰────────────────────────────────────────────────────────────────────────────╯
+
+╭─ What should I do next? ───────────────────────────────────────────────────╮
+│ Reason: disk usage is elevated                                             │
+│ 1. No urgent pressure action detected.                                     │
+╰────────────────────────────────────────────────────────────────────────────╯

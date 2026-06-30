@@ -73,7 +73,7 @@ describe('privacy boundaries', () => {
     const rawPath = ['', 'Users', 'example', '.codex', 'logs_2.sqlite'].join('/');
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.3',
+      toolVersion: '0.2.4',
       generatedAt: '2026-01-01T00:00:00.123Z',
       command: 'doctor',
       status: 'partial',

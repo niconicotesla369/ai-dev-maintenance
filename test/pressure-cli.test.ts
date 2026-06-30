@@ -3,7 +3,27 @@ import { runCli } from '../src/cli.js';
 import type { PressureReport } from '../src/pressure/types.js';
 
 describe('pressure CLI command', () => {
-  test('renders a human live pressure summary', async () => {
+  test('renders a pretty pressure dashboard for TTY users', async () => {
+    const result = await runCli(['pressure'], {
+      env: {},
+      commands: {
+        runPressureDoctor: async () => makePressureReport()
+      },
+      io: {
+        isInputTty: true,
+        isOutputTty: true,
+        columns: 120
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('AIDM SYSTEM PULSE');
+    expect(result.output).toContain('What is using CPU?');
+    expect(result.output).toContain('What should I do next?');
+    expect(result.output).toContain('▰');
+  });
+
+  test('renders the legacy summary for non-TTY output', async () => {
     const result = await runCli(['pressure'], {
       commands: {
         runPressureDoctor: async () => makePressureReport()
@@ -14,6 +34,50 @@ describe('pressure CLI command', () => {
     expect(result.output).toContain('Live pressure   ok');
     expect(result.output).toContain('AI CPU          10.0%');
     expect(result.output).toContain('Top CPU');
+  });
+
+  test('plain pressure output keeps the legacy row format even on TTY', async () => {
+    const result = await runCli(['pressure', '--plain'], {
+      commands: {
+        runPressureDoctor: async () => makePressureReport()
+      },
+      io: {
+        isInputTty: true,
+        isOutputTty: true,
+        columns: 120
+      }
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('Live pressure   ok');
+    expect(result.output).toContain('AI CPU          10.0%');
+    expect(result.output).not.toContain('AIDM SYSTEM PULSE');
+    expect(result.output).not.toContain('\u001b[');
+  });
+
+  test('NO_COLOR, CI, and narrow terminals keep pressure output script-safe', async () => {
+    for (const runtime of [
+      { env: { NO_COLOR: '1' }, columns: 120 },
+      { env: { CI: '1' }, columns: 120 },
+      { env: {}, columns: 72 }
+    ]) {
+      const result = await runCli(['pressure'], {
+        env: runtime.env,
+        commands: {
+          runPressureDoctor: async () => makePressureReport()
+        },
+        io: {
+          isInputTty: true,
+          isOutputTty: true,
+          columns: runtime.columns
+        }
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output).toContain('Live pressure   ok');
+      expect(result.output).not.toContain('AIDM SYSTEM PULSE');
+      expect(result.output).not.toContain('\u001b[');
+    }
   });
 
   test('prints JSON without banner or human labels', async () => {
@@ -55,7 +119,7 @@ describe('pressure CLI command', () => {
 function makePressureReport(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.3',
+    toolVersion: '0.2.4',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

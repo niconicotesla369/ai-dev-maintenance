@@ -3,6 +3,24 @@ import { renderPressureReport } from '../src/pressure/render.js';
 import type { PressureReport } from '../src/pressure/types.js';
 
 describe('pressure human renderer', () => {
+  test('renders a terminal-native pretty pressure dashboard when requested', () => {
+    const output = renderPressureReport(report(), { pretty: true, color: false, columns: 120 });
+
+    expect(output).toContain('AIDM SYSTEM PULSE');
+    expect(output).toContain('Live pressure');
+    expect(output).toContain('Memory free');
+    expect(output).toContain('Disk used');
+    expect(output).toContain('AI CPU');
+    expect(output).toContain('AI RSS');
+    expect(output).toContain('Processes');
+    expect(output).toContain('▰');
+    expect(output).toContain('What is using CPU?');
+    expect(output).toContain('What is using RAM?');
+    expect(output).toContain('What should I do next?');
+    expect(output).toContain('Codex');
+    expect(output).not.toContain('/Users/');
+  });
+
   test('renders CPU, memory, disk, and next actions in a compact card', () => {
     const output = renderPressureReport(report());
 
@@ -74,7 +92,7 @@ describe('pressure human renderer', () => {
 function report(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.3',
+    toolVersion: '0.2.4',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.2.3 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and improves the read-only live pressure check for current CPU/RAM load. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.2.4 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and adds terminal-native pretty output for the guided check and read-only live pressure check. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -12,12 +12,14 @@ The existing Codex-only `fix --safe --yes` path remains available for SQLite WAL
 
 `pressure` is separate from disk cleanup. It reads bounded local process metadata to show which AI-development-related processes are currently using CPU and memory, with labels such as `Codex Renderer`, `node/vitest`, `Chrome Helper`, or `syspolicyd` instead of opaque `other` rows. It does not kill, quit, restart, suspend, renice, or modify any process.
 
+Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compact cards when the terminal is wide enough. `--plain`, `--json`, `NO_COLOR=1`, CI, non-TTY output, and narrow terminals stay script-safe and use the simple row format.
+
 ## Quick Start
 
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.2.3
+npx --yes ai-dev-maintenance@0.2.4
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -26,13 +28,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -40,7 +42,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.2.3
+npm install -g ai-dev-maintenance@0.2.4
 aidm
 ```
 
@@ -51,19 +53,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -71,8 +73,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -86,25 +88,25 @@ If another process has the target database open, `doctor` can complete but `fix 
 ## Commands
 
 ```bash
-ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive]
+ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 ai-dev-maintenance logo [--plain]
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
-ai-dev-maintenance pressure [--json] [--no-banner]
+ai-dev-maintenance pressure [--json] [--no-banner] [--plain]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
-aidm [--wait] [--wait-timeout <minutes>] [--no-interactive]
+aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm logo [--plain]
 aidm doctor [--json] [--show-paths] [--no-banner]
-aidm pressure [--json] [--no-banner]
+aidm pressure [--json] [--no-banner] [--plain]
 aidm cursor clean --safe [--yes]
 aidm reports prune --yes
 aidm backups prune --yes
 ```
 
-Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` to disable ANSI color. Use `doctor --json` for scripts. `--show-paths` prints local machine paths in human output only; do not paste that output into public issues or chat logs.
+Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` for simple row output without ANSI color. Use `doctor --json` or `pressure --json` for scripts. `--show-paths` prints local machine paths in human output only; do not paste that output into public issues or chat logs.
 
 ## Safety Guarantees
 

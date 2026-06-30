@@ -14,6 +14,7 @@ import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
 import { renderReport } from './cli-render.js';
 import { formatBytes, row } from './cli-render.js';
+import { shouldPrettyPrint } from './ui/components.js';
 import { TOOL_VERSION } from './version.js';
 import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
 import path from 'node:path';
@@ -93,6 +94,14 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
         color: parsed.plain !== true && env.NO_COLOR === undefined && io.noColor !== true,
         columns: io.columns
       },
+      pretty: shouldPrettyPrint({
+        plain: parsed.plain,
+        ci: env.CI !== undefined,
+        noColor: env.NO_COLOR !== undefined || io.noColor,
+        isTty: io.isOutputTty,
+        columns: io.columns,
+        minColumns: 80
+      }),
       sleep: runtime.sleep ?? sleep,
       now: runtime.now ?? Date.now,
       commands: {
@@ -146,9 +155,22 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     const flagError = unknownFlagError(parsed.args, new Set(['--json', '--no-banner', '--plain']), 'pressure');
     if (flagError) return { exitCode: 2, output: flagError };
     const report = await commands.runPressureDoctor();
+    const pretty = shouldPrettyPrint({
+      json: parsed.json,
+      plain: parsed.plain,
+      ci: env.CI !== undefined,
+      noColor: env.NO_COLOR !== undefined || io.noColor,
+      isTty: io.isOutputTty,
+      columns: io.columns,
+      minColumns: 80
+    });
     return {
       exitCode: report.status === 'unsupported' ? 2 : 0,
-      output: parsed.json ? `${JSON.stringify(report, null, 2)}\n` : renderPressureReport(report)
+      output: parsed.json ? `${JSON.stringify(report, null, 2)}\n` : renderPressureReport(report, {
+        pretty,
+        color: pretty && parsed.plain !== true && env.NO_COLOR === undefined && io.noColor !== true,
+        columns: io.columns
+      })
     };
   }
 

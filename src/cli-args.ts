@@ -70,7 +70,7 @@ export function usageText(): string {
     '  ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--no-banner] [--plain]',
     '  ai-dev-maintenance logo [--plain]',
     '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
-    '  ai-dev-maintenance pressure [--json] [--no-banner]',
+    '  ai-dev-maintenance pressure [--json] [--no-banner] [--plain]',
     '  ai-dev-maintenance cursor clean --safe [--yes]',
     '  ai-dev-maintenance fix --safe --yes',
     '  ai-dev-maintenance report --latest [--show-paths]',

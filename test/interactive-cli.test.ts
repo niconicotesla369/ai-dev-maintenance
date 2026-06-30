@@ -28,14 +28,16 @@ describe('guided interactive CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('AAAAA   III  DDDD');
     expect(result.output).toContain('AI Dev Maintenance');
+    expect(result.output).toContain('SAFE MAINTENANCE CHECK');
     expect(result.output).toContain('Codex is using the log database. Cleanup is paused.');
     expect(result.output).toContain('Paused for safety');
     expect(result.output).toContain('Codex is still open, so AIDM will not clean anything yet.');
     expect(result.output).toContain('Nothing was changed except a redacted local report.');
-    expect(result.output).toContain('1. Wait');
-    expect(result.output).toContain('2. Re-check');
-    expect(result.output).toContain('3. Show report command');
-    expect(result.output).toContain('4. Quit');
+    expect(result.output).toContain('What do you want to do?');
+    expect(result.output).toContain('[1] Wait');
+    expect(result.output).toContain('[2] Re-check');
+    expect(result.output).toContain('[3] Report');
+    expect(result.output).toContain('[4] Quit');
     expect(fixCalls).toBe(0);
   });
 
@@ -74,6 +76,7 @@ describe('guided interactive CLI', () => {
     });
 
     expect(result.exitCode).toBe(0);
+    expect(result.output).toContain('READY TO CLEAN');
     expect(result.output).toContain('Ready to clean');
     expect(result.output).toContain('Expected cleanup: WAL checkpoint/truncate only.');
     expect(result.output).toContain('Clean now? [y/N]');
@@ -201,6 +204,9 @@ describe('guided interactive CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('AAAAA   III  DDDD');
     expect(result.output).not.toContain('\u001b[');
+    expect(result.output).toContain('Status          Paused for safety');
+    expect(result.output).toContain('1. Wait');
+    expect(result.output).not.toContain('SAFE MAINTENANCE CHECK');
   });
 
   test('logo command is display-only and does not run doctor or fix', async () => {
@@ -327,8 +333,8 @@ describe('guided interactive CLI', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('Wait timed out. Nothing was changed.');
-    expect(result.output).toContain('1. Re-check');
-    expect(result.output).toContain('2. Quit');
+    expect(result.output).toContain('[1] Re-check');
+    expect(result.output).toContain('[2] Quit');
     expect(result.output).toContain('No cleanup was run.');
     expect(fixCalls).toBe(0);
   });
@@ -370,7 +376,7 @@ function memoryIo(input: string, isTty: boolean, columns = 80) {
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.3',
+    toolVersion: '0.2.4',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -389,7 +395,7 @@ function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceRep
 function makeFixReport(status: MaintenanceReport['status'], metrics: MaintenanceReport['metrics'] = {}): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.3',
+    toolVersion: '0.2.4',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'fix --safe',
     status,

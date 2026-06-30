@@ -38,7 +38,7 @@ async function scanClaudeCode(options: ProviderRuntimeOptions = {}): Promise<Sta
       `${CLAUDE_ROOT_CATEGORY}/debug`,
       'log',
       'safe',
-      'debug logs; cleanup is not implemented in v0.2.3'
+      'debug logs; cleanup is not implemented in v0.2.4'
     ),
     entrySpec(
       path.join(root, 'auth'),

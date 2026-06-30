@@ -39,7 +39,7 @@ async function scanCodex(options: ProviderRuntimeOptions = {}): Promise<StateEnt
     pathCategory,
     bytes: scan.bytes,
     reclaimability: 'confirm',
-    note: 'Codex log database diagnostic only; v0.2.3 does not stop writes.',
+    note: 'Codex log database diagnostic only; v0.2.4 does not stop writes.',
     sizeTruncated: scan.sizeTruncated,
     warnings: scan.warnings
   }];

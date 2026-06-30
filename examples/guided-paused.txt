@@ -5,24 +5,36 @@
     A   A   III  DDDD   M   M
       AI Dev Maintenance
 
-Checking whether Codex cleanup is safe...
-AIDM will not delete chats, rewrite history, or touch Codex while it is open.
+╭─ AIDM ─────────────────────────────────────────────────────────────────────╮
+│ Checking whether Codex cleanup is safe...                                  │
+│ AIDM will not delete chats, rewrite history, or touch Codex while it is    │
+│ open.                                                                      │
+╰────────────────────────────────────────────────────────────────────────────╯
 
-Codex is using the log database. Cleanup is paused.
-Status          Paused for safety
-Reason          target database is open by a process
-Target          <home>/.codex/logs_2.sqlite
-Main DB         46.7 MiB
-WAL             5.2 MiB
-SHM             0.0 MiB
+╭─ SAFE MAINTENANCE CHECK ──────────────────────────────────────────────────╮
+│ ✓ Checked. Safe. Nothing deleted.                                          │
+│                                                                            │
+│ Paused for safety                                                          │
+│ Codex is using the log database. Cleanup is paused.                        │
+│ Codex is still open, so AIDM will not clean anything yet.                  │
+│ Nothing was changed except a redacted local report.                        │
+╰────────────────────────────────────────────────────────────────────────────╯
 
-Codex is still open, so AIDM will not clean anything yet.
-Nothing was changed except a redacted local report.
+╭─ Target ───────────────────────────────────────────────────────────────────╮
+│ <home>/.codex/logs_2.sqlite                                                │
+│ Reason: target database is open by a process                               │
+╰────────────────────────────────────────────────────────────────────────────╯
+╭─ Database ─────────────────────────────────────────────────────────────────╮
+│ Main DB         46.7 MiB                                                    │
+│ WAL             5.2 MiB                                                     │
+│ SHM             0.0 MiB                                                     │
+╰────────────────────────────────────────────────────────────────────────────╯
 WAL is SQLite temporary log storage; SHM is SQLite sidecar metadata.
 
-What do you want to do?
-1. Wait
-2. Re-check
-3. Show report command
-4. Quit
+╭─ What do you want to do? ──────────────────────────────────────────────────╮
+│ [1] Wait        Check again later                                          │
+│ [2] Re-check    Run safety check again now                                 │
+│ [3] Report      Show report command                                        │
+│ [4] Quit        Exit AIDM                                                   │
+╰────────────────────────────────────────────────────────────────────────────╯
 Choose [1-4]:

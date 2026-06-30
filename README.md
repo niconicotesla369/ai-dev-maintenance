@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.2.2 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and adds a read-only live pressure check for current CPU/RAM load. It shows total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.2.3 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and improves the read-only live pressure check for current CPU/RAM load. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -10,14 +10,14 @@ The Cursor cleanup path is opt-in. `cursor clean --safe` is a dry run, and `curs
 
 The existing Codex-only `fix --safe --yes` path remains available for SQLite WAL checkpoint/truncate. It creates a private local backup that may contain Codex log data before touching the Codex log database.
 
-`pressure` is separate from disk cleanup. It reads bounded local process metadata to show which AI-development-related processes are currently using CPU and memory. It does not kill, quit, restart, suspend, renice, or modify any process.
+`pressure` is separate from disk cleanup. It reads bounded local process metadata to show which AI-development-related processes are currently using CPU and memory, with labels such as `Codex Renderer`, `node/vitest`, `Chrome Helper`, or `syspolicyd` instead of opaque `other` rows. It does not kill, quit, restart, suspend, renice, or modify any process.
 
 ## Quick Start
 
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.2.2
+npx --yes ai-dev-maintenance@0.2.3
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -26,13 +26,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -40,7 +40,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.2.2
+npm install -g ai-dev-maintenance@0.2.3
 aidm
 ```
 
@@ -51,19 +51,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -71,8 +71,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.2 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.3 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.

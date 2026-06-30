@@ -48,6 +48,13 @@ describe('live pressure doctor', () => {
       },
       totals: {
         processCount: 3
+      },
+      pressureLevel: {
+        overall: 'medium',
+        cpu: 'medium',
+        memory: 'ok',
+        disk: 'medium',
+        reasons: expect.arrayContaining(['AI CPU pressure is elevated', 'disk usage is elevated'])
       }
     });
     expect(report.processes.map((process) => process.provider)).toEqual(['codex', 'cursor', 'claude-code']);

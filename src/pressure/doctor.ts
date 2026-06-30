@@ -3,7 +3,7 @@ import type { CommandRunResult } from '../types.js';
 import { TOOL_VERSION } from '../version.js';
 import { classifyPressureProcesses } from './classify.js';
 import { parseDfOutput, parsePsOutput, parseVmStatOutput } from './parse.js';
-import type { PressureReport } from './types.js';
+import type { PressureLevel, PressureReport } from './types.js';
 
 export type PressureCommandName = 'ps' | 'vm_stat' | 'df';
 type PressureCommandResult = Pick<CommandRunResult, 'code' | 'stdout' | 'stderr'> &
@@ -63,6 +63,7 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     aiRssBytes: report.processes.reduce((sum, process) => sum + process.rssBytes, 0),
     processCount: report.processes.length
   };
+  report.pressureLevel = pressureLevel(report);
   report.nextActions = nextActions(report);
   return report;
 }
@@ -107,6 +108,13 @@ function baseReport(generatedAt: string, status: PressureReport['status'], warni
       aiRssBytes: 0,
       processCount: 0
     },
+    pressureLevel: {
+      overall: 'ok',
+      cpu: 'ok',
+      memory: 'ok',
+      disk: 'ok',
+      reasons: []
+    },
     warnings,
     nextActions: []
   };
@@ -131,11 +139,55 @@ function round1(value: number): number {
 
 function nextActions(report: PressureReport): string[] {
   const actions: string[] = [];
-  if ((report.memory.freePercent ?? 100) < 15 || (report.memory.freePercent === undefined && (report.memory.freeBytes ?? Number.POSITIVE_INFINITY) < 1_073_741_824)) {
+  if (report.pressureLevel.memory === 'high') {
     actions.push('Close idle browser tabs or AI tool windows before restarting the Mac.');
   }
-  if (report.totals.aiCpuPercent >= 80) actions.push('Wait for the top AI process to finish, or close that app manually if it is stuck.');
-  if ((report.disk.capacityPercent ?? 0) >= 90) actions.push('Run doctor to inspect disk buckets before deleting anything.');
+  if (report.pressureLevel.cpu === 'high') actions.push('Wait for the top AI process to finish, or close that app manually if it is stuck.');
+  if (report.pressureLevel.disk === 'high') actions.push('Run doctor to inspect disk buckets before deleting anything.');
   if (actions.length === 0) actions.push('No urgent pressure action detected.');
   return actions;
+}
+
+function pressureLevel(report: PressureReport) {
+  const cpu = cpuLevel(report.totals.aiCpuPercent);
+  const memory = memoryLevel(report);
+  const disk = diskLevel(report.disk.capacityPercent);
+  const reasons: string[] = [];
+  if (memory === 'high') reasons.push('memory pressure is high');
+  if (cpu === 'high') reasons.push('AI CPU pressure is high');
+  if (disk === 'high') reasons.push('disk pressure is high');
+  if (cpu === 'medium') reasons.push('AI CPU pressure is elevated');
+  if (disk === 'medium') reasons.push('disk usage is elevated');
+  return {
+    overall: maxLevel(cpu, memory, disk),
+    cpu,
+    memory,
+    disk,
+    reasons
+  };
+}
+
+function cpuLevel(cpuPercent: number): PressureLevel {
+  if (cpuPercent >= 80) return 'high';
+  if (cpuPercent >= 30) return 'medium';
+  return 'ok';
+}
+
+function memoryLevel(report: PressureReport): PressureLevel {
+  if ((report.memory.freePercent ?? 100) < 15) return 'high';
+  if (report.memory.freePercent === undefined && (report.memory.freeBytes ?? Number.POSITIVE_INFINITY) < 1_073_741_824) return 'high';
+  if ((report.memory.freePercent ?? 100) < 25) return 'medium';
+  return 'ok';
+}
+
+function diskLevel(capacityPercent: number | undefined): PressureLevel {
+  if ((capacityPercent ?? 0) >= 90) return 'high';
+  if ((capacityPercent ?? 0) >= 80) return 'medium';
+  return 'ok';
+}
+
+function maxLevel(...levels: PressureLevel[]): PressureLevel {
+  if (levels.includes('high')) return 'high';
+  if (levels.includes('medium')) return 'medium';
+  return 'ok';
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "toolVersion": "0.2.2",
+  "toolVersion": "0.2.3",
   "generatedAt": "2026-06-30T00:00:00.000Z",
   "command": "pressure",
   "status": "ok",
@@ -10,6 +10,15 @@
     "aiCpuPercent": 15.3,
     "aiRssBytes": 1363148800,
     "processCount": 3
+  },
+  "pressureLevel": {
+    "overall": "medium",
+    "cpu": "ok",
+    "memory": "ok",
+    "disk": "medium",
+    "reasons": [
+      "disk usage is elevated"
+    ]
   },
   "memory": {
     "pageSizeBytes": 16384,
@@ -29,8 +38,9 @@
       "ppid": 1,
       "provider": "codex",
       "category": "app",
+      "displayName": "Codex",
       "cpuPercent": 10,
-      "memPercent": 7.5,
+      "memoryPercent": 7.5,
       "rssBytes": 629145600,
       "commandSummary": "Codex.app"
     }

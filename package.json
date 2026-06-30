@@ -1,6 +1,6 @@
 {
   "name": "ai-dev-maintenance",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Safely diagnose AI coding tool disk state and live CPU/RAM pressure.",
   "type": "module",
   "packageManager": "pnpm@10.34.4",

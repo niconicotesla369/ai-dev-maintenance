@@ -5,6 +5,7 @@ export function renderPressureReport(report: PressureReport): string {
   const lines = [
     row('Live pressure', report.status),
     row('Memory free', memoryFreeText(report)),
+    row('Pressure level', report.pressureLevel.overall),
     row('Disk used', report.disk.capacityPercent === undefined ? 'unknown' : `${report.disk.capacityPercent}%`),
     row('AI CPU', `${report.totals.aiCpuPercent.toFixed(1)}%`),
     row('AI RSS', formatBytes(report.totals.aiRssBytes)),
@@ -12,6 +13,7 @@ export function renderPressureReport(report: PressureReport): string {
   ];
 
   for (const warning of report.warnings) lines.push(row('Warning', warning));
+  for (const reason of report.pressureLevel.reasons.slice(0, 3)) lines.push(row('Reason', reason));
 
   const topCpu = [...report.processes].sort((a, b) => b.cpuPercent - a.cpuPercent).slice(0, 5);
   if (topCpu.length > 0) {
@@ -39,5 +41,5 @@ function processRow(process: PressureProcess, mode: 'cpu' | 'rss'): string {
   const metric = mode === 'cpu'
     ? `${process.cpuPercent.toFixed(1)}%`
     : formatBytes(process.rssBytes);
-  return row(`${process.provider}`, `${metric} ${process.category} pid=${process.pid}`);
+  return row(process.displayName || process.provider, `${metric} ${process.category} pid=${process.pid}`);
 }

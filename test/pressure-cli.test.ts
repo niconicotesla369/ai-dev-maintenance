@@ -55,7 +55,7 @@ describe('pressure CLI command', () => {
 function makePressureReport(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.2',
+    toolVersion: '0.2.3',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',
@@ -65,6 +65,13 @@ function makePressureReport(): PressureReport {
       aiCpuPercent: 10,
       aiRssBytes: 128 * 1024 * 1024,
       processCount: 1
+    },
+    pressureLevel: {
+      overall: 'ok',
+      cpu: 'ok',
+      memory: 'ok',
+      disk: 'medium',
+      reasons: []
     },
     memory: {
       freePercent: 25,
@@ -81,6 +88,7 @@ function makePressureReport(): PressureReport {
         ppid: 1,
         provider: 'codex',
         category: 'app',
+        displayName: 'Codex',
         cpuPercent: 10,
         memoryPercent: 4,
         rssBytes: 128 * 1024 * 1024,

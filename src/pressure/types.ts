@@ -11,6 +11,9 @@ export type PressureProcessCategory =
   | 'extension-host'
   | 'terminal'
   | 'language-server'
+  | 'browser'
+  | 'build-tool'
+  | 'system'
   | 'helper'
   | 'remote-control'
   | 'other';
@@ -20,6 +23,7 @@ export type PressureProcess = {
   ppid: number;
   provider: PressureProviderId;
   category: PressureProcessCategory;
+  displayName: string;
   cpuPercent: number;
   memoryPercent: number;
   rssBytes: number;
@@ -45,6 +49,16 @@ export type DiskPressureSnapshot = {
   availableBytes?: number;
 };
 
+export type PressureLevel = 'ok' | 'medium' | 'high';
+
+export type PressureLevelSummary = {
+  overall: PressureLevel;
+  cpu: PressureLevel;
+  memory: PressureLevel;
+  disk: PressureLevel;
+  reasons: string[];
+};
+
 export type PressureReport = {
   schemaVersion: 1;
   toolVersion: string;
@@ -61,6 +75,7 @@ export type PressureReport = {
     aiRssBytes: number;
     processCount: number;
   };
+  pressureLevel: PressureLevelSummary;
   warnings: string[];
   nextActions: string[];
 };

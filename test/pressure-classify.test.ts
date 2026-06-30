@@ -20,7 +20,7 @@ describe('pressure process classification', () => {
       [13, 'cursor', 'app'],
       [14, 'cursor', 'extension-host'],
       [15, 'remote-control', 'remote-control'],
-      [16, 'other', 'other']
+      [16, 'other', 'system']
     ]);
   });
 
@@ -30,6 +30,20 @@ describe('pressure process classification', () => {
     expect(summary).toContain('<absolute-path>');
     expect(summary).not.toContain('/tmp/example/private');
     expect(summary).not.toContain('abc');
+  });
+
+  test('gives common high-pressure non-AI processes readable categories and names', () => {
+    const rows = [
+      raw('/usr/local/bin/node ./node_modules/vitest/vitest.mjs run', 20),
+      raw('/Applications/Google Chrome.app/Contents/Frameworks/Google Chrome Helper (Renderer).app/Contents/MacOS/Google Chrome Helper (Renderer)', 21),
+      raw('/usr/libexec/syspolicyd', 22)
+    ];
+
+    expect(classifyPressureProcesses(rows).map((row) => [row.displayName, row.provider, row.category])).toEqual([
+      ['node/vitest', 'other', 'build-tool'],
+      ['Chrome Helper', 'other', 'browser'],
+      ['syspolicyd', 'other', 'system']
+    ]);
   });
 });
 

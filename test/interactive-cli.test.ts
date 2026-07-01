@@ -376,7 +376,7 @@ function memoryIo(input: string, isTty: boolean, columns = 80) {
 function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.5',
+    toolVersion: '0.2.6',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -395,7 +395,7 @@ function makeDoctorReport(overrides: Partial<MaintenanceReport>): MaintenanceRep
 function makeFixReport(status: MaintenanceReport['status'], metrics: MaintenanceReport['metrics'] = {}): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.5',
+    toolVersion: '0.2.6',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'fix --safe',
     status,

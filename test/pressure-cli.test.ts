@@ -18,9 +18,18 @@ describe('pressure CLI command', () => {
 
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('AIDM SYSTEM PULSE');
+    expect(result.output).toContain('AIDM check: OK');
+    expect(result.output).toContain('Pressure: OK');
     expect(result.output).toContain('What is using CPU?');
+    expect(result.output).toContain('#  Process');
+    expect(result.output).toContain('CPU');
+    expect(result.output).toContain('RAM');
+    expect(result.output).toContain('Type');
+    expect(result.output).toContain('PID');
     expect(result.output).toContain('What should I do next?');
     expect(result.output).toContain('▰');
+    expect(result.output).not.toContain('Live pressure: OK');
+    expect(result.output).not.toContain('Reason:');
   });
 
   test('renders the legacy summary for non-TTY output', async () => {
@@ -119,7 +128,7 @@ describe('pressure CLI command', () => {
 function makePressureReport(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.5',
+    toolVersion: '0.2.6',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

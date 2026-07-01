@@ -50,7 +50,7 @@ function renderPrettyPressureReport(report: PressureReport, options: PressureRen
   const color = options.color === true;
   const captured = capturedTime(report.generatedAt);
   const heading = box('AIDM SYSTEM PULSE', [
-    `${statusIcon(report.status)} Live pressure: ${statusText(report.status)}${captured ? `    Captured ${captured}` : ''}`,
+    `${statusIcon(report.status)} AIDM check: ${statusText(report.status)}    Pressure: ${pressureText(report.pressureLevel.overall)}${captured ? `    Captured ${captured}` : ''}`,
     '',
     metricLine('Memory free', memoryFreeText(report), memoryLabel(report), memoryMeterValue(report), 100, report.pressureLevel.memory, color),
     metricLine('Disk used', diskText(report), diskLabel(report), report.disk.capacityPercent ?? 0, 100, report.pressureLevel.disk, color),
@@ -63,11 +63,14 @@ function renderPrettyPressureReport(report: PressureReport, options: PressureRen
   const topMem = [...report.processes].sort((a, b) => b.rssBytes - a.rssBytes).slice(0, 5);
   const panels = processPanels(topCpu, topMem, columns, color);
   const warnings = report.warnings.map((warning) => `! ${warning}`);
-  const reasons = report.pressureLevel.reasons.slice(0, 3).map((reason) => `Reason: ${reason}`);
+  const signals = report.pressureLevel.reasons.slice(0, 3).map((reason) => `• ${sentenceCase(reason)}`);
+  const signalLines = signals.length > 0 ? ['Signals', ...signals, ''] : [];
+  const actionLines = report.nextActions.map((action, index) => `${index + 1}. ${action}`);
   const next = box('What should I do next?', [
     ...warnings,
-    ...reasons,
-    ...report.nextActions.map((action, index) => `${index + 1}. ${action}`)
+    ...signalLines,
+    'Next actions',
+    ...actionLines
   ], { width: columns, color, tone: report.pressureLevel.overall === 'high' ? 'warning' : 'info' });
 
   return `${heading}\n${panels}\n${next}`;
@@ -126,7 +129,15 @@ function processPanels(topCpu: PressureProcess[], topMem: PressureProcess[], col
 
 function processLines(processes: PressureProcess[], mode: 'cpu' | 'rss', color: boolean): string[] {
   if (processes.length === 0) return ['No matching processes detected.'];
-  return processes.map((process, index) => {
+  const metricLabel = mode === 'cpu' ? 'CPU' : 'RAM';
+  const header = [
+    '#',
+    padVisible('Process', 18),
+    padVisible(metricLabel, 10),
+    padVisible('Type', 14),
+    'PID'
+  ].join('  ');
+  const rows = processes.map((process, index) => {
     const nameTone = process.provider === 'codex' ? 'accent' : process.category === 'system' ? 'muted' : 'default';
     const name = colorize(truncateVisible(process.displayName || process.provider, 18), nameTone, color);
     const metric = mode === 'cpu' ? `${process.cpuPercent.toFixed(1)}%` : formatBytes(process.rssBytes);
@@ -138,6 +149,7 @@ function processLines(processes: PressureProcess[], mode: 'cpu' | 'rss', color: 
       `pid ${process.pid}`
     ].join('  ');
   });
+  return [header, ...rows];
 }
 
 function memoryLabel(report: PressureReport): string {
@@ -202,6 +214,17 @@ function statusIcon(status: PressureReport['status']): string {
 
 function statusText(status: PressureReport['status']): string {
   return status.toUpperCase();
+}
+
+function pressureText(level: PressureLevel): string {
+  if (level === 'high') return 'HIGH';
+  if (level === 'medium') return 'ATTENTION';
+  return 'OK';
+}
+
+function sentenceCase(value: string): string {
+  if (!value) return value;
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }
 
 function capturedTime(value: string): string {

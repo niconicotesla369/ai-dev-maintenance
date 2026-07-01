@@ -7,7 +7,8 @@ describe('pressure human renderer', () => {
     const output = renderPressureReport(report(), { pretty: true, color: false, columns: 120 });
 
     expect(output).toContain('AIDM SYSTEM PULSE');
-    expect(output).toContain('Live pressure');
+    expect(output).toContain('AIDM check: OK');
+    expect(output).toContain('Pressure: OK');
     expect(output).toContain('Memory free');
     expect(output).toContain('Disk used');
     expect(output).toContain('AI CPU');
@@ -16,6 +17,11 @@ describe('pressure human renderer', () => {
     expect(output).toContain('▰');
     expect(output).toContain('What is using CPU?');
     expect(output).toContain('What is using RAM?');
+    expect(output).toContain('#  Process');
+    expect(output).toContain('CPU');
+    expect(output).toContain('RAM');
+    expect(output).toContain('Type');
+    expect(output).toContain('PID');
     expect(output).toContain('What should I do next?');
     expect(output).toContain('Codex');
     expect(output).not.toContain('/Users/');
@@ -87,12 +93,35 @@ describe('pressure human renderer', () => {
     expect(output).toContain('Reason          memory pressure is high');
     expect(output).toContain('Reason          AI CPU pressure is high');
   });
+
+  test('renders pressure signals without repeated reason labels in pretty output', () => {
+    const input = report();
+    input.pressureLevel = {
+      overall: 'high',
+      cpu: 'high',
+      memory: 'high',
+      disk: 'medium',
+      reasons: ['memory pressure is high', 'AI CPU pressure is high', 'disk usage is elevated']
+    };
+
+    const output = renderPressureReport(input, { pretty: true, color: false, columns: 120 });
+
+    expect(output).toContain('AIDM check: OK');
+    expect(output).toContain('Pressure: HIGH');
+    expect(output).toContain('Signals');
+    expect(output).toContain('• Memory pressure is high');
+    expect(output).toContain('• AI CPU pressure is high');
+    expect(output).toContain('• Disk usage is elevated');
+    expect(output).toContain('Next actions');
+    expect(output).not.toContain('Live pressure: OK');
+    expect(output).not.toContain('Reason:');
+  });
 });
 
 function report(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.5',
+    toolVersion: '0.2.6',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

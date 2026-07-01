@@ -13,6 +13,16 @@ describe('terminal UI components', () => {
     }
   });
 
+  test('dims box borders in color mode without changing visible width', () => {
+    const output = box('SYSTEM', ['Ready'], { width: 24, color: true });
+
+    expect(output).toContain('\u001b[2m╭─\u001b[0m');
+    expect(output).toContain('\u001b[2m│\u001b[0m Ready');
+    for (const line of output.trimEnd().split('\n')) {
+      expect(visibleLength(line)).toBe(24);
+    }
+  });
+
   test('wraps long text without breaking borders', () => {
     const output = box('NEXT', ['Close idle browser tabs before restarting the Mac.'], { width: 34, color: false });
     const lines = output.trimEnd().split('\n');

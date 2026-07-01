@@ -5,5 +5,5 @@ After WAL       0.0 MiB
 Reclaimed       5.0 MiB
 Changed         private backup + WAL cleanup
 Report          <home>/.ai-dev-maintenance/reports/report-2026-06-28T00-00-00-000Z.json
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.5 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.6 -- report --latest
 Next            Review the before/after metrics in the saved report.

@@ -1,5 +1,5 @@
 ╭─ AIDM SYSTEM PULSE ─────────────────────────────────────────────────────────╮
-│ ✓ Live pressure: OK    Captured 00:00                                      │
+│ ✓ AIDM check: OK    Pressure: ATTENTION    Captured 00:00                  │
 │                                                                            │
 │ Memory free     3.0 GiB       OK        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
 │ Disk used       80%           ELEVATED  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱             │
@@ -9,18 +9,23 @@
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What is using CPU? ─────────────────╮
+│ #  Process             CPU        Type            PID                      │
 │  1  Codex               10.0%       app             pid 123                │
 │  2  Cursor ExtHost      3.5%        extension-host  pid 456                │
 │  3  Claude              1.8%        terminal        pid 789                │
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What is using RAM? ─────────────────╮
+│ #  Process             RAM        Type            PID                      │
 │  1  Codex               600.0 MiB   app             pid 123                │
 │  2  Cursor ExtHost      500.0 MiB   extension-host  pid 456                │
 │  3  Claude              200.0 MiB   terminal        pid 789                │
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What should I do next? ───────────────────────────────────────────────────╮
-│ Reason: disk usage is elevated                                             │
+│ Signals                                                                    │
+│ • Disk usage is elevated                                                   │
+│                                                                            │
+│ Next actions                                                               │
 │ 1. No urgent pressure action detected.                                     │
 ╰────────────────────────────────────────────────────────────────────────────╯

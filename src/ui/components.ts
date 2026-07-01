@@ -85,17 +85,18 @@ export function box(title: string, lines: string[], options: BoxOptions): string
   const titleText = title ? ` ${title} ` : '';
   const coloredTitle = colorize(titleText, options.tone ?? 'info', options.color);
   const topFill = Math.max(0, width - 3 - visibleLength(titleText));
+  const border = (value: string) => colorize(value, 'muted', options.color);
   const output = [
-    `╭─${coloredTitle}${'─'.repeat(topFill)}╮`
+    `${border('╭─')}${coloredTitle}${border(`${'─'.repeat(topFill)}╮`)}`
   ];
 
   for (const line of lines) {
     for (const wrapped of wrapPreservingBlank(line, innerWidth)) {
-      output.push(`│ ${padVisible(wrapped, innerWidth)} │`);
+      output.push(`${border('│')} ${padVisible(wrapped, innerWidth)} ${border('│')}`);
     }
   }
 
-  output.push(`╰${'─'.repeat(width - 2)}╯`);
+  output.push(border(`╰${'─'.repeat(width - 2)}╯`));
   return `${output.join('\n')}\n`;
 }
 

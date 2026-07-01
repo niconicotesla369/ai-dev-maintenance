@@ -92,7 +92,7 @@ describe('pressure human renderer', () => {
 function report(): PressureReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.2.4',
+    toolVersion: '0.2.5',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

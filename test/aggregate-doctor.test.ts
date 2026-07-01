@@ -118,7 +118,7 @@ async function makeFixtureHome(): Promise<string> {
 function makeAggregateReport(): MaintenanceReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.2.4',
+    toolVersion: '0.2.5',
     generatedAt: '2026-01-01T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

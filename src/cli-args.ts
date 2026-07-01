@@ -68,6 +68,7 @@ export function usageText(): string {
   return [
     'Usage:',
     '  ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--no-banner] [--plain]',
+    '  ai-dev-maintenance --version | -v | version',
     '  ai-dev-maintenance logo [--plain]',
     '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
     '  ai-dev-maintenance pressure [--json] [--no-banner] [--plain]',

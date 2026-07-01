@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.2.4 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and adds terminal-native pretty output for the guided check and read-only live pressure check. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.2.5 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and adds terminal-native pretty output for the guided check and read-only live pressure check. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -19,7 +19,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.2.4
+npx --yes ai-dev-maintenance@0.2.5
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -28,13 +28,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -42,7 +42,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.2.4
+npm install -g ai-dev-maintenance@0.2.5
 aidm
 ```
 
@@ -53,19 +53,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -73,8 +73,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.4 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.2.5 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -89,6 +89,7 @@ If another process has the target database open, `doctor` can complete but `fix 
 
 ```bash
 ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
+ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
 ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
 ai-dev-maintenance pressure [--json] [--no-banner] [--plain]
@@ -98,6 +99,7 @@ ai-dev-maintenance report --latest [--show-paths]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
+aidm --version | -v | version
 aidm logo [--plain]
 aidm doctor [--json] [--show-paths] [--no-banner]
 aidm pressure [--json] [--no-banner] [--plain]

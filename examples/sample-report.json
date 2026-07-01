@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.2.4",
+  "toolVersion": "0.2.5",
   "generatedAt": "2026-06-25T00:00:00.000Z",
   "command": "doctor",
   "status": "ok",
@@ -30,7 +30,7 @@
           "pathCategory": "<home>/.codex/logs_2.sqlite",
           "bytes": 7340032,
           "reclaimability": "confirm",
-          "note": "Codex log database diagnostic only; v0.2.4 does not stop writes."
+          "note": "Codex log database diagnostic only; v0.2.5 does not stop writes."
         }
       ],
       "advisories": [
@@ -65,7 +65,7 @@
           "pathCategory": "<home>/.claude/debug",
           "bytes": 1048576,
           "reclaimability": "safe",
-          "note": "debug logs; cleanup is not implemented in v0.2.4"
+          "note": "debug logs; cleanup is not implemented in v0.2.5"
         }
       ],
       "advisories": []

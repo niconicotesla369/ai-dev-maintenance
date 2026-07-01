@@ -2,6 +2,7 @@ import { lstat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { scanPathSize } from '../fs-size.js';
+import { TOOL_VERSION } from '../version.js';
 import type { MaintenanceProvider, ProviderRuntimeOptions, Reclaimability, StateCategory, StateEntry } from './types.js';
 
 const CLAUDE_ROOT_CATEGORY = '<home>/.claude';
@@ -38,7 +39,7 @@ async function scanClaudeCode(options: ProviderRuntimeOptions = {}): Promise<Sta
       `${CLAUDE_ROOT_CATEGORY}/debug`,
       'log',
       'safe',
-      'debug logs; cleanup is not implemented in v0.2.4'
+      `debug logs; cleanup is not implemented in v${TOOL_VERSION}`
     ),
     entrySpec(
       path.join(root, 'auth'),

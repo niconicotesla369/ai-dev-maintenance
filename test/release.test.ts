@@ -2,8 +2,15 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 import { fixSafeConfirmationError, isDirectCliInvocation, renderReport, runCli } from '../src/cli.js';
 import type { MaintenanceReport } from '../src/types.js';
+import { TOOL_VERSION } from '../src/version.js';
 
 describe('release readiness', () => {
+  test('package version and runtime version stay synchronized', async () => {
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+
+    expect(pkg.version).toBe(TOOL_VERSION);
+  });
+
   test('package prepack forces verification and build before publishing', async () => {
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 
@@ -85,7 +92,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.4',
+      toolVersion: '0.2.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -110,7 +117,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.4 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.5 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -127,7 +134,7 @@ describe('release readiness', () => {
           path: latestPath,
           report: {
             schemaVersion: 1,
-            toolVersion: '0.2.4',
+            toolVersion: '0.2.5',
             generatedAt: '2026-01-01T00:00:00.000Z',
             command: 'doctor',
             status: 'ok',
@@ -158,7 +165,7 @@ describe('release readiness', () => {
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.4',
+      toolVersion: '0.2.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -189,9 +196,21 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.2.4');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.2.5');
+    expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
+  });
+
+  test('provider notes derive release wording from TOOL_VERSION', async () => {
+    const sources = [
+      await readFile('src/providers/codex.ts', 'utf8'),
+      await readFile('src/providers/claude-code.ts', 'utf8')
+    ].join('\n');
+
+    expect(sources).toContain('TOOL_VERSION');
+    expect(sources).not.toContain('v0.2.5 does not stop writes');
+    expect(sources).not.toContain('not implemented in v0.2.5');
   });
 
   test('readmes document live pressure doctor without process mutation', async () => {
@@ -266,7 +285,7 @@ describe('release readiness', () => {
           return {
             report: {
               schemaVersion: 1,
-              toolVersion: '0.2.4',
+              toolVersion: '0.2.5',
               generatedAt: '2026-01-01T00:00:00.000Z',
               command: 'doctor',
               status: 'ok',
@@ -290,7 +309,7 @@ describe('release readiness', () => {
   test('supports equals wait timeout and rejects command-looking timeout values', async () => {
     const doctorReport: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.4',
+      toolVersion: '0.2.5',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',

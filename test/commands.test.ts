@@ -100,9 +100,31 @@ describe('command execution safety', () => {
     try {
       const main = path.join(dir, 'logs_2.sqlite');
       await writeFile(main, '');
+      let resolverCalled = false;
+      let runnerCalled = false;
 
-      const result = await checkOpenHandles([main, `${main}-wal`, `${main}-shm`]);
+      const result = await checkOpenHandles([main, `${main}-wal`, `${main}-shm`], {
+        trustedCommandPath: async (name) => {
+          resolverCalled = true;
+          expect(name).toBe('lsof');
+          return '/mock/lsof';
+        },
+        runCommand: async (command, args) => {
+          runnerCalled = true;
+          expect(command).toBe('/mock/lsof');
+          expect(args).toEqual(['-F', 'pcn', main]);
+          return {
+            code: 1,
+            stdout: '',
+            stderr: '',
+            stdoutTruncated: false,
+            stderrTruncated: false
+          };
+        }
+      });
 
+      expect(resolverCalled).toBe(true);
+      expect(runnerCalled).toBe(true);
       expect(result).toEqual({
         usable: true,
         openHandles: false,

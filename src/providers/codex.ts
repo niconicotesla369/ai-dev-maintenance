@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { trustedCommandPath, runCommand } from '../commands.js';
+import { trustedCommandPath as defaultTrustedCommandPath, runCommand as defaultRunCommand } from '../commands.js';
 import { scanPathSize } from '../fs-size.js';
 import { detectTargetState, pathExists, safeTargetStateForReport } from '../fs-safety.js';
 import { defaultCodexHome, redactPath, targetTriple } from '../paths.js';
@@ -92,8 +92,15 @@ async function runCodexDoctor(options: ProviderDoctorOptions) {
   return { report, reportPath };
 }
 
-export async function checkOpenHandles(paths: string[]) {
+type CheckOpenHandlesOptions = {
+  trustedCommandPath?: typeof defaultTrustedCommandPath;
+  runCommand?: typeof defaultRunCommand;
+};
+
+export async function checkOpenHandles(paths: string[], options: CheckOpenHandlesOptions = {}) {
   try {
+    const trustedCommandPath = options.trustedCommandPath ?? defaultTrustedCommandPath;
+    const runCommand = options.runCommand ?? defaultRunCommand;
     const existingPaths = [];
     for (const candidate of paths) {
       if (await pathExists(candidate)) existingPaths.push(candidate);
@@ -115,8 +122,8 @@ export async function checkOpenHandles(paths: string[]) {
 
 export async function knownCodexProcessExists(): Promise<boolean | 'unknown'> {
   try {
-    const ps = await trustedCommandPath('ps');
-    const result = await runCommand(ps, ['-axo', 'pid=,comm=,command='], { timeoutMs: 5_000 });
+    const ps = await defaultTrustedCommandPath('ps');
+    const result = await defaultRunCommand(ps, ['-axo', 'pid=,comm=,command='], { timeoutMs: 5_000 });
     if (result.stdoutTruncated || result.stderrTruncated) return 'unknown';
     if (result.code !== 0) return 'unknown';
     return parseKnownCodexProcess(result.stdout);

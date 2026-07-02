@@ -1,31 +1,38 @@
 ╭─ AIDM SYSTEM PULSE ─────────────────────────────────────────────────────────╮
 │ ✓ AIDM check: OK    Pressure: ATTENTION    Captured 00:00                  │
 │                                                                            │
-│ Memory free     3.0 GiB       OK        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ Memory free     30%           OK        ▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
 │ Disk used       80%           ELEVATED  ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱             │
 │ AI CPU          15.3%         OK        ▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
 │ AI RSS          1.3 GiB       BUSY      ▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱             │
-│ Processes       3             OK        ▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ Other CPU       42.5%         BUSY      ▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ Other RSS       450.0 MiB     OK        ▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
+│ Processes       5             OK        ▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱             │
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What is using CPU? ─────────────────╮
 │ #  Process             CPU        Type            PID                      │
-│  1  Codex               10.0%       app             pid 123                │
-│  2  Cursor ExtHost      3.5%        extension-host  pid 456                │
-│  3  Claude              1.8%        terminal        pid 789                │
+│  1  Chrome Helper      35.0%       browser         pid 321                │
+│  2  Codex              10.0%       app             pid 123                │
+│  3  WindowServer       7.5%        system          pid 654                │
+│  4  Cursor ExtHost     3.5%        extension-host  pid 456                │
+│  5  Claude             1.8%        app             pid 789                │
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What is using RAM? ─────────────────╮
 │ #  Process             RAM        Type            PID                      │
-│  1  Codex               600.0 MiB   app             pid 123                │
-│  2  Cursor ExtHost      500.0 MiB   extension-host  pid 456                │
-│  3  Claude              200.0 MiB   terminal        pid 789                │
+│  1  Codex              600.0 MiB   app             pid 123                │
+│  2  Cursor ExtHost     500.0 MiB   extension-host  pid 456                │
+│  3  Chrome Helper      350.0 MiB   browser         pid 321                │
+│  4  Claude             200.0 MiB   app             pid 789                │
+│  5  WindowServer       100.0 MiB   system          pid 654                │
 ╰────────────────────────────────────────────────────────────────────────────╯
 
 ╭─ What should I do next? ───────────────────────────────────────────────────╮
 │ Signals                                                                    │
 │ • Disk usage is elevated                                                   │
+│ • Non-AI process pressure is elevated                                      │
 │                                                                            │
 │ Next actions                                                               │
-│ 1. No urgent pressure action detected.                                     │
+│ 1. Check Activity Monitor for non-AI apps using high CPU.                  │
 ╰────────────────────────────────────────────────────────────────────────────╯

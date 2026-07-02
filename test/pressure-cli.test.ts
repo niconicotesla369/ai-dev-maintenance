@@ -108,7 +108,8 @@ describe('pressure CLI command', () => {
       command: 'pressure',
       status: 'ok',
       totals: {
-        aiCpuPercent: 10
+        aiCpuPercent: 10,
+        otherCpuPercent: 0
       }
     });
   });
@@ -127,8 +128,8 @@ describe('pressure CLI command', () => {
 
 function makePressureReport(): PressureReport {
   return {
-    schemaVersion: 1,
-    toolVersion: '0.2.6',
+    schemaVersion: 2,
+    toolVersion: '0.3.0',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',
@@ -137,6 +138,10 @@ function makePressureReport(): PressureReport {
     totals: {
       aiCpuPercent: 10,
       aiRssBytes: 128 * 1024 * 1024,
+      aiProcessCount: 1,
+      otherCpuPercent: 0,
+      otherRssBytes: 0,
+      otherProcessCount: 0,
       processCount: 1
     },
     pressureLevel: {

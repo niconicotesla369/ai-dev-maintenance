@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { runCommand } from '../src/commands.js';
+import { ALLOWED_COMMANDS, isTrustedSystemCommand, runCommand } from '../src/commands.js';
 import { checkOpenHandles } from '../src/doctor.js';
 import { classifyLsofResult, planFixSafety } from '../src/safety.js';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -7,6 +7,34 @@ import os from 'node:os';
 import path from 'node:path';
 
 describe('command execution safety', () => {
+  test('allows pressure system commands only through trusted root-owned paths', () => {
+    expect(ALLOWED_COMMANDS).toMatchObject({
+      ps: '/bin/ps',
+      vm_stat: '/usr/bin/vm_stat',
+      df: '/bin/df',
+      memory_pressure: '/usr/bin/memory_pressure'
+    });
+
+    expect(isTrustedSystemCommand({
+      path: '/usr/bin/vm_stat',
+      uid: 0,
+      mode: 0o100755,
+      isSymbolicLink: false
+    })).toBe(true);
+    expect(isTrustedSystemCommand({
+      path: '/bin/df',
+      uid: 0,
+      mode: 0o100755,
+      isSymbolicLink: false
+    })).toBe(true);
+    expect(isTrustedSystemCommand({
+      path: '/usr/bin/memory_pressure',
+      uid: 0,
+      mode: 0o100755,
+      isSymbolicLink: false
+    })).toBe(true);
+  });
+
   test('does not pass the real HOME to subprocesses by default', async () => {
     const result = await runCommand('/usr/bin/printenv', ['HOME']);
 

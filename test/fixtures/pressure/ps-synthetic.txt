@@ -1,0 +1,3 @@
+71147 1 267.9 1.4 104000 /Applications/Codex.app/Contents/MacOS/Codex
+25365 1 4.8 0.8 82000 /Applications/Cursor.app/Contents/MacOS/Cursor Helper (Renderer)
+34323 1 2.4 0.6 58000 claude

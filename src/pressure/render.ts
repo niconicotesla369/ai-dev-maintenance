@@ -1,5 +1,6 @@
 import { formatBytes, row } from '../cli-render.js';
 import { box, colorize, meter, padVisible, truncateVisible, twoColumns } from '../ui/components.js';
+import { cpuLevelForPercent } from './levels.js';
 import type { PressureLevel, PressureProcess, PressureReport } from './types.js';
 
 export type PressureRenderOptions = {
@@ -23,6 +24,8 @@ function renderSimplePressureReport(report: PressureReport): string {
     row('Disk used', report.disk.capacityPercent === undefined ? 'unknown' : `${report.disk.capacityPercent}%`),
     row('AI CPU', `${report.totals.aiCpuPercent.toFixed(1)}%`),
     row('AI RSS', formatBytes(report.totals.aiRssBytes)),
+    row('Other CPU', `${report.totals.otherCpuPercent.toFixed(1)}%`),
+    row('Other RSS', formatBytes(report.totals.otherRssBytes)),
     row('Processes', String(report.totals.processCount))
   ];
 
@@ -56,6 +59,8 @@ function renderPrettyPressureReport(report: PressureReport, options: PressureRen
     metricLine('Disk used', diskText(report), diskLabel(report), report.disk.capacityPercent ?? 0, 100, report.pressureLevel.disk, color),
     metricLine('AI CPU', `${report.totals.aiCpuPercent.toFixed(1)}%`, cpuLabel(report.pressureLevel.cpu), report.totals.aiCpuPercent, 100, report.pressureLevel.cpu, color),
     metricLine('AI RSS', formatBytes(report.totals.aiRssBytes), rssLabel(report.totals.aiRssBytes), report.totals.aiRssBytes, 2 * 1024 * 1024 * 1024, rssTone(report.totals.aiRssBytes), color),
+    metricLine('Other CPU', `${report.totals.otherCpuPercent.toFixed(1)}%`, otherCpuLabel(report.totals.otherCpuPercent), report.totals.otherCpuPercent, 100, cpuLevelForPercent(report.totals.otherCpuPercent), color),
+    metricLine('Other RSS', formatBytes(report.totals.otherRssBytes), rssLabel(report.totals.otherRssBytes), report.totals.otherRssBytes, 2 * 1024 * 1024 * 1024, rssTone(report.totals.otherRssBytes), color),
     metricLine('Processes', String(report.totals.processCount), processLabel(report.totals.processCount), report.totals.processCount, 50, processTone(report.totals.processCount), color)
   ], { width: columns, color, tone: toneForLevel(report.pressureLevel.overall) });
 
@@ -167,6 +172,13 @@ function diskLabel(report: PressureReport): string {
 }
 
 function cpuLabel(level: PressureLevel): string {
+  if (level === 'high') return 'HEAVY';
+  if (level === 'medium') return 'BUSY';
+  return 'OK';
+}
+
+function otherCpuLabel(cpuPercent: number): string {
+  const level = cpuLevelForPercent(cpuPercent);
   if (level === 'high') return 'HEAVY';
   if (level === 'medium') return 'BUSY';
   return 'OK';

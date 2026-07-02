@@ -7,7 +7,10 @@ import type { CommandRunResult, CommandStat } from './types.js';
 export const ALLOWED_COMMANDS = {
   sqlite3: '/usr/bin/sqlite3',
   lsof: '/usr/sbin/lsof',
-  ps: '/bin/ps'
+  ps: '/bin/ps',
+  vm_stat: '/usr/bin/vm_stat',
+  df: '/bin/df',
+  memory_pressure: '/usr/bin/memory_pressure'
 } as const;
 
 export function isTrustedSystemCommand(stat: CommandStat): boolean {

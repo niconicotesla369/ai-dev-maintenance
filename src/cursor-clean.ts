@@ -99,10 +99,12 @@ export async function runCursorSafeCleanup(options: CursorCleanupOptions = {}): 
   }
 
   let deletedEntries = 0;
+  let deletedBytes = 0;
   const warnings = [...plan.warnings];
   for (const target of plan.targets) {
     const result = await deleteChildren(target.path);
     deletedEntries += result.deletedEntries;
+    deletedBytes += result.deletedBytes;
     warnings.push(...result.warnings);
   }
 
@@ -110,7 +112,7 @@ export async function runCursorSafeCleanup(options: CursorCleanupOptions = {}): 
     ...plan,
     status: 'ok',
     warnings: unique(warnings),
-    deletedBytes: plan.reclaimableBytes,
+    deletedBytes,
     deletedEntries,
     mode: 'cleanup'
   };
@@ -156,45 +158,55 @@ async function safeCleanupRoot(targetPath: string): Promise<{ missing: boolean; 
   return { missing: false, blockers };
 }
 
-async function deleteChildren(dir: string): Promise<{ deletedEntries: number; warnings: string[] }> {
+type DeleteResult = {
+  deletedBytes: number;
+  deletedEntries: number;
+  warnings: string[];
+};
+
+async function deleteChildren(dir: string): Promise<DeleteResult> {
   let entries: string[];
   try {
     entries = await readdir(dir);
   } catch {
-    return { deletedEntries: 0, warnings: ['failed to read Cursor cleanup target'] };
+    return { deletedBytes: 0, deletedEntries: 0, warnings: ['failed to read Cursor cleanup target'] };
   }
 
+  let deletedBytes = 0;
   let deletedEntries = 0;
   const warnings: string[] = [];
   for (const entry of entries) {
     const result = await deleteEntry(path.join(dir, entry));
+    deletedBytes += result.deletedBytes;
     deletedEntries += result.deletedEntries;
     warnings.push(...result.warnings);
   }
-  return { deletedEntries, warnings };
+  return { deletedBytes, deletedEntries, warnings };
 }
 
-async function deleteEntry(entryPath: string): Promise<{ deletedEntries: number; warnings: string[] }> {
+async function deleteEntry(entryPath: string): Promise<DeleteResult> {
   let stat;
   try {
     stat = await lstat(entryPath);
   } catch {
-    return { deletedEntries: 0, warnings: ['failed to inspect Cursor cleanup entry'] };
+    return { deletedBytes: 0, deletedEntries: 0, warnings: ['failed to inspect Cursor cleanup entry'] };
   }
 
   if (stat.isSymbolicLink()) {
-    return { deletedEntries: 0, warnings: ['skipped symbolic link in Cursor cleanup target'] };
+    return { deletedBytes: 0, deletedEntries: 0, warnings: ['skipped symbolic link in Cursor cleanup target'] };
   }
   if (stat.isDirectory()) {
     const childResult = await deleteChildren(entryPath);
     try {
       await rmdir(entryPath);
       return {
+        deletedBytes: childResult.deletedBytes,
         deletedEntries: childResult.deletedEntries + 1,
         warnings: childResult.warnings
       };
     } catch {
       return {
+        deletedBytes: childResult.deletedBytes,
         deletedEntries: childResult.deletedEntries,
         warnings: [...childResult.warnings, 'failed to remove Cursor cleanup directory']
       };
@@ -203,12 +215,12 @@ async function deleteEntry(entryPath: string): Promise<{ deletedEntries: number;
   if (stat.isFile()) {
     try {
       await unlink(entryPath);
-      return { deletedEntries: 1, warnings: [] };
+      return { deletedBytes: stat.size, deletedEntries: 1, warnings: [] };
     } catch {
-      return { deletedEntries: 0, warnings: ['failed to remove Cursor cleanup file'] };
+      return { deletedBytes: 0, deletedEntries: 0, warnings: ['failed to remove Cursor cleanup file'] };
     }
   }
-  return { deletedEntries: 0, warnings: ['skipped unsupported Cursor cleanup entry'] };
+  return { deletedBytes: 0, deletedEntries: 0, warnings: ['skipped unsupported Cursor cleanup entry'] };
 }
 
 function cursorRoot(env: NodeJS.ProcessEnv = process.env): string {

@@ -1,7 +1,12 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { scanPublicText, scanPackageText } from '../scripts/public-hygiene.mjs';
+import {
+  listSourceFilesForScan,
+  scanPublicText,
+  scanPackageText,
+  shouldScanSourceFile
+} from '../scripts/public-hygiene.mjs';
 
 describe('public hygiene scanner', () => {
   test('passes neutral public text', () => {
@@ -62,5 +67,34 @@ describe('public hygiene scanner', () => {
   test('readme does not contain private launch material', async () => {
     const readme = await readFile(path.join(process.cwd(), 'README.md'), 'utf8').catch(() => '');
     expect(scanPublicText(readme, 'README.md')).toEqual([]);
+  });
+
+  test('source scan excludes local-only untracked review and agent files without hiding tracked docs', () => {
+    const agentPlan = [['.', 'claude'].join(''), 'brain', 'implementation_plan.md'].join('/');
+    const reviewFile = ['REVIEW-0', '.', '1', '.', '4-critical.ja.md'].join('');
+
+    expect(shouldScanSourceFile(agentPlan, { tracked: false })).toBe(false);
+    expect(shouldScanSourceFile(reviewFile, { tracked: false })).toBe(false);
+    expect(shouldScanSourceFile('docs/superpowers/plans/private-brief.md', { tracked: false })).toBe(false);
+    expect(shouldScanSourceFile('docs/public-guide.md', { tracked: true })).toBe(true);
+    expect(shouldScanSourceFile('src/cli-router.ts', { tracked: false })).toBe(true);
+  });
+
+  test('source scan warns when git listing is unavailable before using fallback filtering', async () => {
+    const warnings: string[] = [];
+    const files = await listSourceFilesForScan(process.cwd(), {
+      listAllFiles: async () => [
+        'docs/superpowers/plans/private-brief.md',
+        'src/cli-router.ts',
+        'README.md'
+      ],
+      listGitFiles: async () => undefined,
+      warn: (message: string) => warnings.push(message)
+    });
+
+    expect(files).toEqual(['README.md', 'src/cli-router.ts']);
+    expect(warnings).toEqual([
+      'public hygiene: git file listing unavailable; falling back to source scan filters'
+    ]);
   });
 });

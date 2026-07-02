@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 1,
-  "toolVersion": "0.2.6",
+  "schemaVersion": 2,
+  "toolVersion": "0.3.0",
   "generatedAt": "2026-06-30T00:00:00.000Z",
   "command": "pressure",
   "status": "ok",
@@ -9,7 +9,11 @@
   "totals": {
     "aiCpuPercent": 15.3,
     "aiRssBytes": 1363148800,
-    "processCount": 3
+    "aiProcessCount": 3,
+    "otherCpuPercent": 42.5,
+    "otherRssBytes": 471859200,
+    "otherProcessCount": 2,
+    "processCount": 5
   },
   "pressureLevel": {
     "overall": "medium",
@@ -17,7 +21,8 @@
     "memory": "ok",
     "disk": "medium",
     "reasons": [
-      "disk usage is elevated"
+      "disk usage is elevated",
+      "non-AI process pressure is elevated"
     ]
   },
   "memory": {
@@ -43,10 +48,54 @@
       "memoryPercent": 7.5,
       "rssBytes": 629145600,
       "commandSummary": "Codex.app"
+    },
+    {
+      "pid": 456,
+      "ppid": 1,
+      "provider": "cursor",
+      "category": "extension-host",
+      "displayName": "Cursor ExtHost",
+      "cpuPercent": 3.5,
+      "memoryPercent": 4.2,
+      "rssBytes": 524288000,
+      "commandSummary": "Cursor Helper"
+    },
+    {
+      "pid": 789,
+      "ppid": 1,
+      "provider": "claude-code",
+      "category": "app",
+      "displayName": "Claude",
+      "cpuPercent": 1.8,
+      "memoryPercent": 1.7,
+      "rssBytes": 209715200,
+      "commandSummary": "claude"
+    },
+    {
+      "pid": 321,
+      "ppid": 1,
+      "provider": "other",
+      "category": "browser",
+      "displayName": "Chrome Helper",
+      "cpuPercent": 35,
+      "memoryPercent": 2.8,
+      "rssBytes": 367001600,
+      "commandSummary": "Google Chrome Helper"
+    },
+    {
+      "pid": 654,
+      "ppid": 1,
+      "provider": "other",
+      "category": "system",
+      "displayName": "WindowServer",
+      "cpuPercent": 7.5,
+      "memoryPercent": 0.8,
+      "rssBytes": 104857600,
+      "commandSummary": "WindowServer"
     }
   ],
   "warnings": [],
   "nextActions": [
-    "No urgent pressure action detected."
+    "Check Activity Monitor for non-AI apps using high CPU."
   ]
 }

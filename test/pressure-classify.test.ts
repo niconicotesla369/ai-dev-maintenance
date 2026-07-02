@@ -45,6 +45,43 @@ describe('pressure process classification', () => {
       ['syspolicyd', 'other', 'system']
     ]);
   });
+
+  test('keeps non-AI command summaries to the executable basename only', () => {
+    const [process] = classifyPressureProcesses([
+      raw('/usr/local/bin/python worker.py -p private-value Bearer secret-token --project sensitive', 30)
+    ]);
+
+    expect(process.provider).toBe('other');
+    expect(process.commandSummary).toBe('python');
+    expect(process.commandSummary).not.toContain('private-value');
+    expect(process.commandSummary).not.toContain('Bearer');
+    expect(process.commandSummary).not.toContain('secret-token');
+    expect(process.commandSummary).not.toContain('--project');
+  });
+
+  test('characterizes known process labels without changing provider scope', () => {
+    const rows = [
+      raw('/Applications/Codex.app/Contents/MacOS/Codex', 40),
+      raw('/Applications/Codex.app/Contents/Frameworks/Codex Framework.framework/Helpers/Codex Renderer.app/Contents/MacOS/Codex Renderer', 41),
+      raw('claude', 42),
+      raw('/Applications/Cursor.app/Contents/MacOS/Cursor', 43),
+      raw('Cursor Helper: extension-host (user) workspace [1-1]', 44),
+      raw('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper', 45),
+      raw('/System/Library/CoreServices/WindowServer', 46),
+      raw('/Library/PrivilegedHelperTools/ChromeRemoteDesktopHost.app/Contents/MacOS/remoting_me2me_host', 47)
+    ];
+
+    expect(classifyPressureProcesses(rows).map((row) => [row.displayName, row.provider, row.category])).toEqual([
+      ['Codex', 'codex', 'app'],
+      ['Codex Renderer', 'codex', 'renderer'],
+      ['Claude', 'claude-code', 'app'],
+      ['Cursor', 'cursor', 'app'],
+      ['Cursor ExtHost', 'cursor', 'extension-host'],
+      ['Chrome Helper', 'other', 'browser'],
+      ['WindowServer', 'other', 'system'],
+      ['Remote Desktop', 'remote-control', 'remote-control']
+    ]);
+  });
 });
 
 function raw(command: string, pid: number) {

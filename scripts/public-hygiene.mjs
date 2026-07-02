@@ -1,5 +1,9 @@
 import { readFile, readdir } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import path from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
 
 const publicBlocked = [
   ['alice', 'private'].join('-'),
@@ -88,6 +92,44 @@ async function listFiles(root, options = {}, prefix = '') {
   return files;
 }
 
+export function shouldScanSourceFile(file, options = {}) {
+  const normalized = file.split(path.sep).join('/');
+  if (options.tracked !== false) return true;
+  const localAgentDir = ['.', 'claude'].join('');
+  const localReviewFile = ['REVIEW-0', '.', '1', '.', '4-critical.ja.md'].join('');
+  if (normalized === localAgentDir || normalized.startsWith(`${localAgentDir}/`)) return false;
+  if (normalized === localReviewFile) return false;
+  if (normalized === 'docs' || normalized.startsWith('docs/')) return false;
+  return true;
+}
+
+export async function listSourceFilesForScan(root, options = {}) {
+  const gitLister = options.listGitFiles ?? listGitFiles;
+  const allLister = options.listAllFiles ?? listFiles;
+  const warn = options.warn ?? ((message) => console.error(message));
+  const tracked = await gitLister(root, ['ls-files', '-z', '--cached']);
+  const untracked = await gitLister(root, ['ls-files', '-z', '--others', '--exclude-standard']);
+  if (tracked && untracked) {
+    return [...new Set([
+      ...tracked.filter((file) => shouldScanSourceFile(file, { tracked: true })),
+      ...untracked.filter((file) => shouldScanSourceFile(file, { tracked: false }))
+    ])].sort();
+  }
+  warn('public hygiene: git file listing unavailable; falling back to source scan filters');
+  return (await allLister(root)).filter((file) => shouldScanSourceFile(file, { tracked: false })).sort();
+}
+
+async function listGitFiles(root, args) {
+  try {
+    const { stdout } = await execFileAsync('git', ['-C', root, ...args], {
+      maxBuffer: 16 * 1024 * 1024
+    });
+    return stdout.split('\0').filter(Boolean);
+  } catch {
+    return undefined;
+  }
+}
+
 async function listPackageFiles(root) {
   const pkg = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   const entries = Array.isArray(pkg.files) ? pkg.files : [];
@@ -120,7 +162,7 @@ async function main() {
   const root = process.cwd();
   const packageMode = process.argv.includes('--package');
   const requirePrivateDenylist = process.argv.includes('--require-private-denylist');
-  const files = packageMode ? await listPackageFiles(root) : await listFiles(root);
+  const files = packageMode ? await listPackageFiles(root) : await listSourceFilesForScan(root);
   const privateBlocked = await readPrivateDenylist(undefined, { required: requirePrivateDenylist });
   const findings = [];
   for (const file of files) {

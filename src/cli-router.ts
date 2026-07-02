@@ -46,6 +46,7 @@ export type CliRuntimeOptions = {
 
 export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}): Promise<CliResult> {
   if (isRootVersionRequest(argv)) return { exitCode: 0, output: `${TOOL_VERSION}\n` };
+  if (isRootHelpRequest(argv)) return { exitCode: 0, output: usageText() };
 
   const parsed = parseCliArgs(argv);
   const commands: CliCommands = {
@@ -223,6 +224,10 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
 
 function isRootVersionRequest(argv: string[]): boolean {
   return argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v' || argv[0] === 'version');
+}
+
+function isRootHelpRequest(argv: string[]): boolean {
+  return argv.length === 1 && (argv[0] === '--help' || argv[0] === '-h');
 }
 
 function renderCursorCleanupResult(result: Awaited<ReturnType<typeof defaultRunCursorSafeCleanup>>): string {

@@ -60,7 +60,7 @@ export type PressureLevelSummary = {
 };
 
 export type PressureReport = {
-  schemaVersion: 1;
+  schemaVersion: 2;
   toolVersion: string;
   generatedAt: string;
   command: 'pressure';
@@ -73,6 +73,10 @@ export type PressureReport = {
   totals: {
     aiCpuPercent: number;
     aiRssBytes: number;
+    aiProcessCount: number;
+    otherCpuPercent: number;
+    otherRssBytes: number;
+    otherProcessCount: number;
     processCount: number;
   };
   pressureLevel: PressureLevelSummary;

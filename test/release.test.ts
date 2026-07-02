@@ -92,7 +92,7 @@ describe('release readiness', () => {
   test('human report output explains the decision and saved report review command', () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.6',
+      toolVersion: '0.3.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -117,7 +117,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.2.6 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.0 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -134,7 +134,7 @@ describe('release readiness', () => {
           path: latestPath,
           report: {
             schemaVersion: 1,
-            toolVersion: '0.2.6',
+            toolVersion: '0.3.0',
             generatedAt: '2026-01-01T00:00:00.000Z',
             command: 'doctor',
             status: 'ok',
@@ -165,7 +165,7 @@ describe('release readiness', () => {
   test('blocked fix after checkpoint attempt does not claim nothing changed', async () => {
     const report: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.6',
+      toolVersion: '0.3.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'fix --safe',
       status: 'blocked',
@@ -196,10 +196,112 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.2.6');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.0');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
+  });
+
+  test('readmes document CLI exit codes', async () => {
+    const readmes = [
+      await readFile('README.md', 'utf8'),
+      await readFile('README.ja.md', 'utf8')
+    ].join('\n');
+
+    expect(readmes).toContain('Exit Codes');
+    expect(readmes).toContain('0');
+    expect(readmes).toContain('1');
+    expect(readmes).toContain('2');
+    expect(readmes).toContain('3');
+    expect(readmes).toContain('usage');
+    expect(readmes).toContain('blocked');
+    expect(readmes).toContain('unexpected runtime error');
+  });
+
+  test('package publishes the changelog with the npm artifact', async () => {
+    const pkg = JSON.parse(await readFile('package.json', 'utf8'));
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(pkg.files).toContain('CHANGELOG.md');
+    expect(changelog).toContain('# Changelog');
+    expect(changelog).toContain('## 0.3.0 - 2026-07-02');
+    for (const version of [
+      '0.1.0',
+      '0.1.1',
+      '0.1.2',
+      '0.1.3',
+      '0.1.4',
+      '0.1.5',
+      '0.2.0',
+      '0.2.2',
+      '0.2.3',
+      '0.2.4',
+      '0.2.5',
+      '0.2.6',
+      '0.3.0'
+    ]) {
+      expect(changelog).toContain(`## ${version}`);
+    }
+  });
+
+  test('changelog documents the pressure schema v2 change in the 0.3.0 release notes', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(changelog).toContain('pressure schemaVersion 2');
+    expect(changelog).toContain('separates AI totals from non-AI process pressure');
+    expect(changelog).toContain('aiCpuPercent no longer includes non-AI processes');
+  });
+
+  test('pressure examples stay on schema v2 with separated AI and non-AI totals', async () => {
+    const example = JSON.parse(await readFile('examples/pressure.json', 'utf8'));
+    const text = await readFile('examples/pressure.txt', 'utf8');
+
+    expect(example.schemaVersion).toBe(2);
+    expect(example.totals).toEqual(expect.objectContaining({
+      aiCpuPercent: expect.any(Number),
+      aiRssBytes: expect.any(Number),
+      aiProcessCount: expect.any(Number),
+      otherCpuPercent: expect.any(Number),
+      otherRssBytes: expect.any(Number),
+      otherProcessCount: expect.any(Number),
+      processCount: expect.any(Number)
+    }));
+    expect(text).toContain('Other CPU');
+    expect(text).toContain('Other RSS');
+  });
+
+  test('readmes document pressure measurement sources and schema v2 semantics', async () => {
+    const readmes = [
+      await readFile('README.md', 'utf8'),
+      await readFile('README.ja.md', 'utf8')
+    ].join('\n');
+
+    expect(readmes).toContain('memory_pressure -Q');
+    expect(readmes).toContain('100% = one logical CPU core');
+    expect(readmes).toContain('100% = 1つの論理CPUコア');
+    expect(readmes).toContain('schemaVersion 2');
+    expect(readmes).toContain('aiCpuPercent no longer includes non-AI processes');
+    expect(readmes).toContain('aiCpuPercent は非AIプロセスを含みません');
+  });
+
+  test('public release notes do not carry stale current-series wording or duplicate migration notes', async () => {
+    const readme = await readFile('README.md', 'utf8');
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(readme).toContain('v0.3.x currently supports macOS only');
+    expect(readme).not.toContain('v0.2.x currently supports macOS only');
+    expect(countOccurrences(readme, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
+    expect(countOccurrences(changelog, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
+  });
+
+  test('pressure CPU thresholds are shared between diagnosis and rendering', async () => {
+    const doctor = await readFile('src/pressure/doctor.ts', 'utf8');
+    const render = await readFile('src/pressure/render.ts', 'utf8');
+
+    expect(doctor).toContain("from './levels.js'");
+    expect(render).toContain("from './levels.js'");
+    expect(render).not.toContain('cpuPercent >= 80');
+    expect(render).not.toContain('cpuPercent >= 30');
   });
 
   test('provider notes derive release wording from TOOL_VERSION', async () => {
@@ -209,8 +311,8 @@ describe('release readiness', () => {
     ].join('\n');
 
     expect(sources).toContain('TOOL_VERSION');
-    expect(sources).not.toContain('v0.2.6 does not stop writes');
-    expect(sources).not.toContain('not implemented in v0.2.6');
+    expect(sources).not.toContain('v0.3.0 does not stop writes');
+    expect(sources).not.toContain('not implemented in v0.3.0');
   });
 
   test('readmes document live pressure doctor without process mutation', async () => {
@@ -285,7 +387,7 @@ describe('release readiness', () => {
           return {
             report: {
               schemaVersion: 1,
-              toolVersion: '0.2.6',
+              toolVersion: '0.3.0',
               generatedAt: '2026-01-01T00:00:00.000Z',
               command: 'doctor',
               status: 'ok',
@@ -309,7 +411,7 @@ describe('release readiness', () => {
   test('supports equals wait timeout and rejects command-looking timeout values', async () => {
     const doctorReport: MaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.2.6',
+      toolVersion: '0.3.0',
       generatedAt: '2026-01-01T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -339,3 +441,7 @@ describe('release readiness', () => {
     expect(isDirectCliInvocation(moduleUrl, realPath)).toBe(true);
   });
 });
+
+function countOccurrences(value: string, needle: string): number {
+  return value.split(needle).length - 1;
+}

@@ -37,10 +37,8 @@ export function parseVmStatOutput(stdout: string): MemoryPressureSnapshot {
   const pageSizeBytes = firstNumber(stdout, /page size(?: of)?\s+(\d+)(?:\s+bytes)?/i);
   const pagesFree = firstNumber(stdout, /Pages free:\s*(\d+)/);
   return {
-    totalBytes: firstNumber(stdout, /has\s+(\d+)\s+\(/),
     pageSizeBytes,
     freeBytes: pageSizeBytes !== undefined && pagesFree !== undefined ? pageSizeBytes * pagesFree : undefined,
-    freePercent: firstNumber(stdout, /System-wide memory free percentage:\s*(\d+)%/),
     pagesFree,
     pagesPurgeable: firstNumber(stdout, /Pages purgeable:\s*(\d+)/),
     pagesUsedByCompressor: firstNumber(stdout, /Pages (?:used by|occupied by) compressor:\s*(\d+)/),
@@ -48,6 +46,14 @@ export function parseVmStatOutput(stdout: string): MemoryPressureSnapshot {
     swapouts: firstNumber(stdout, /Swapouts:\s*(\d+)/),
     pageins: firstNumber(stdout, /Pageins:\s*(\d+)/),
     pageouts: firstNumber(stdout, /Pageouts:\s*(\d+)/)
+  };
+}
+
+export function parseMemoryPressureOutput(stdout: string): MemoryPressureSnapshot {
+  return {
+    totalBytes: firstNumber(stdout, /has\s+(\d+)\s+\(/),
+    pageSizeBytes: firstNumber(stdout, /page size(?: of)?\s+(\d+)(?:\s+bytes)?/i),
+    freePercent: firstNumber(stdout, /System-wide memory free percentage:\s*(\d+)%/)
   };
 }
 

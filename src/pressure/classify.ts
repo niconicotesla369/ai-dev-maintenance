@@ -14,7 +14,7 @@ export function classifyPressureProcesses(rows: RawProcessRow[]): PressureProces
       cpuPercent: row.cpuPercent,
       memoryPercent: row.memoryPercent,
       rssBytes: row.rssBytes,
-      commandSummary: redactCommandSummary(row.command)
+      commandSummary: provider === 'other' ? executableBasename(row.command) : redactCommandSummary(row.command)
     };
   });
 }
@@ -99,4 +99,9 @@ function fallbackName(command: string): string {
   const lastPathPart = redacted.split(/\s+/)[0]?.split('/').filter(Boolean).at(-1);
   const candidate = lastPathPart && lastPathPart !== '<absolute-path>' ? lastPathPart : redacted.split(/\s+/)[0];
   return (candidate ?? 'process').slice(0, 32);
+}
+
+function executableBasename(command: string): string {
+  const executable = command.trim().split(/\s+/)[0] ?? 'process';
+  return executable.split('/').filter(Boolean).at(-1)?.slice(0, 32) || 'process';
 }

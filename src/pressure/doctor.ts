@@ -1,11 +1,12 @@
-import { runCommand, trustedCommandPath } from '../commands.js';
+import { runCommand as defaultRunCommand, trustedCommandPath as defaultTrustedCommandPath } from '../commands.js';
 import type { CommandRunResult } from '../types.js';
 import { TOOL_VERSION } from '../version.js';
 import { classifyPressureProcesses } from './classify.js';
-import { parseDfOutput, parsePsOutput, parseVmStatOutput } from './parse.js';
-import type { PressureLevel, PressureReport } from './types.js';
+import { cpuLevelForPercent } from './levels.js';
+import { parseDfOutput, parseMemoryPressureOutput, parsePsOutput, parseVmStatOutput } from './parse.js';
+import type { MemoryPressureSnapshot, PressureLevel, PressureProcess, PressureReport, PressureProviderId } from './types.js';
 
-export type PressureCommandName = 'ps' | 'vm_stat' | 'df';
+export type PressureCommandName = 'ps' | 'vm_stat' | 'df' | 'memory_pressure';
 type PressureCommandResult = Pick<CommandRunResult, 'code' | 'stdout' | 'stderr'> &
   Partial<Pick<CommandRunResult, 'stdoutTruncated' | 'stderrTruncated' | 'timedOut'>>;
 
@@ -13,6 +14,8 @@ export type PressureDoctorOptions = {
   platform?: NodeJS.Platform;
   now?: () => string;
   run?: (command: PressureCommandName) => Promise<PressureCommandResult>;
+  runCommand?: typeof defaultRunCommand;
+  resolveCommandPath?: typeof defaultTrustedCommandPath;
 };
 
 export async function runPressureDoctor(options: PressureDoctorOptions = {}): Promise<PressureReport> {
@@ -22,10 +25,14 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     return baseReport(generatedAt, 'unsupported', ['platform is unsupported'], platform);
   }
 
-  const run = options.run ?? runSystemCommand;
-  const [ps, vm, df] = await Promise.all([
+  const run = options.run ?? ((command) => runSystemCommand(command, {
+    runCommand: options.runCommand ?? defaultRunCommand,
+    resolveCommandPath: options.resolveCommandPath ?? defaultTrustedCommandPath
+  }));
+  const [ps, vm, memoryPressure, df] = await Promise.all([
     run('ps').catch((error) => failed(error)),
     run('vm_stat').catch((error) => failed(error)),
+    run('memory_pressure').catch((error) => failed(error)),
     run('df').catch((error) => failed(error))
   ]);
 
@@ -51,6 +58,21 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     report.memory = parseVmStatOutput(vm.stdout);
   }
 
+  if (!usable(memoryPressure)) {
+    report.status = 'partial';
+    report.warnings.push(commandWarning('memory_pressure', memoryPressure));
+  } else {
+    const memoryPressureSnapshot = parseMemoryPressureOutput(memoryPressure.stdout);
+    report.memory = {
+      ...report.memory,
+      ...definedMemorySnapshot(memoryPressureSnapshot)
+    };
+    if (memoryPressureSnapshot.freePercent === undefined) {
+      report.status = 'partial';
+      report.warnings.push('memory pressure source unavailable');
+    }
+  }
+
   if (!usable(df)) {
     report.status = 'partial';
     report.warnings.push(commandWarning('df', df));
@@ -58,33 +80,45 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     report.disk = parseDfOutput(df.stdout);
   }
 
-  report.totals = {
-    aiCpuPercent: round1(report.processes.reduce((sum, process) => sum + process.cpuPercent, 0)),
-    aiRssBytes: report.processes.reduce((sum, process) => sum + process.rssBytes, 0),
-    processCount: report.processes.length
-  };
+  report.totals = pressureTotals(report.processes);
   report.pressureLevel = pressureLevel(report);
   report.nextActions = nextActions(report);
   return report;
 }
 
-async function runSystemCommand(command: PressureCommandName) {
+async function runSystemCommand(
+  command: PressureCommandName,
+  deps: {
+    runCommand: typeof defaultRunCommand;
+    resolveCommandPath: typeof defaultTrustedCommandPath;
+  }
+) {
   if (command === 'ps') {
-    const ps = await trustedCommandPath('ps');
-    return runCommand(ps, ['-axo', 'pid=,ppid=,%cpu=,%mem=,rss=,command='], {
+    const ps = await deps.resolveCommandPath('ps');
+    return deps.runCommand(ps, ['-axo', 'pid=,ppid=,%cpu=,%mem=,rss=,command='], {
       timeoutMs: 5_000,
       maxStdoutBytes: 512_000,
       maxStderrBytes: 16_000
     });
   }
   if (command === 'vm_stat') {
-    return runCommand('/usr/bin/vm_stat', [], {
+    const vmStat = await deps.resolveCommandPath('vm_stat');
+    return deps.runCommand(vmStat, [], {
       timeoutMs: 5_000,
       maxStdoutBytes: 64_000,
       maxStderrBytes: 16_000
     });
   }
-  return runCommand('/bin/df', ['-h', '/System/Volumes/Data'], {
+  if (command === 'memory_pressure') {
+    const memoryPressure = await deps.resolveCommandPath('memory_pressure');
+    return deps.runCommand(memoryPressure, ['-Q'], {
+      timeoutMs: 5_000,
+      maxStdoutBytes: 64_000,
+      maxStderrBytes: 16_000
+    });
+  }
+  const df = await deps.resolveCommandPath('df');
+  return deps.runCommand(df, ['-h', '/System/Volumes/Data'], {
     timeoutMs: 5_000,
     maxStdoutBytes: 64_000,
     maxStderrBytes: 16_000
@@ -93,7 +127,7 @@ async function runSystemCommand(command: PressureCommandName) {
 
 function baseReport(generatedAt: string, status: PressureReport['status'], warnings: string[], platform: NodeJS.Platform): PressureReport {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     toolVersion: TOOL_VERSION,
     generatedAt,
     command: 'pressure',
@@ -106,6 +140,10 @@ function baseReport(generatedAt: string, status: PressureReport['status'], warni
     totals: {
       aiCpuPercent: 0,
       aiRssBytes: 0,
+      aiProcessCount: 0,
+      otherCpuPercent: 0,
+      otherRssBytes: 0,
+      otherProcessCount: 0,
       processCount: 0
     },
     pressureLevel: {
@@ -126,6 +164,8 @@ function usable(result: PressureCommandResult): boolean {
 
 function commandWarning(command: string, result: PressureCommandResult): string {
   if (result.timedOut) return `${command} timed out`;
+  if (result.stderr.includes('untrusted system command')) return `${command} unavailable (untrusted path)`;
+  if (command === 'memory_pressure') return 'memory pressure source unavailable';
   return `${command} failed`;
 }
 
@@ -137,6 +177,24 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
+function pressureTotals(processes: PressureProcess[]): PressureReport['totals'] {
+  const ai = processes.filter((process) => isAiProvider(process.provider));
+  const other = processes.filter((process) => !isAiProvider(process.provider));
+  return {
+    aiCpuPercent: round1(ai.reduce((sum, process) => sum + process.cpuPercent, 0)),
+    aiRssBytes: ai.reduce((sum, process) => sum + process.rssBytes, 0),
+    aiProcessCount: ai.length,
+    otherCpuPercent: round1(other.reduce((sum, process) => sum + process.cpuPercent, 0)),
+    otherRssBytes: other.reduce((sum, process) => sum + process.rssBytes, 0),
+    otherProcessCount: other.length,
+    processCount: processes.length
+  };
+}
+
+function isAiProvider(provider: PressureProviderId): boolean {
+  return provider === 'codex' || provider === 'claude-code' || provider === 'cursor';
+}
+
 function nextActions(report: PressureReport): string[] {
   const actions: string[] = [];
   if (report.pressureLevel.memory === 'high') {
@@ -144,20 +202,26 @@ function nextActions(report: PressureReport): string[] {
   }
   if (report.pressureLevel.cpu === 'high') actions.push('Wait for the top AI process to finish, or close that app manually if it is stuck.');
   if (report.pressureLevel.disk === 'high') actions.push('Run doctor to inspect disk buckets before deleting anything.');
+  if (report.pressureLevel.reasons.some((reason) => reason.startsWith('non-AI process pressure'))) {
+    actions.push('Check Activity Monitor for non-AI apps using high CPU.');
+  }
   if (actions.length === 0) actions.push('No urgent pressure action detected.');
   return actions;
 }
 
 function pressureLevel(report: PressureReport) {
-  const cpu = cpuLevel(report.totals.aiCpuPercent);
+  const cpu = cpuLevelForPercent(report.totals.aiCpuPercent);
   const memory = memoryLevel(report);
   const disk = diskLevel(report.disk.capacityPercent);
   const reasons: string[] = [];
+  const otherCpu = cpuLevelForPercent(report.totals.otherCpuPercent);
   if (memory === 'high') reasons.push('memory pressure is high');
   if (cpu === 'high') reasons.push('AI CPU pressure is high');
   if (disk === 'high') reasons.push('disk pressure is high');
   if (cpu === 'medium') reasons.push('AI CPU pressure is elevated');
   if (disk === 'medium') reasons.push('disk usage is elevated');
+  if (otherCpu === 'high') reasons.push('non-AI process pressure is high');
+  if (otherCpu === 'medium') reasons.push('non-AI process pressure is elevated');
   return {
     overall: maxLevel(cpu, memory, disk),
     cpu,
@@ -167,15 +231,8 @@ function pressureLevel(report: PressureReport) {
   };
 }
 
-function cpuLevel(cpuPercent: number): PressureLevel {
-  if (cpuPercent >= 80) return 'high';
-  if (cpuPercent >= 30) return 'medium';
-  return 'ok';
-}
-
 function memoryLevel(report: PressureReport): PressureLevel {
   if ((report.memory.freePercent ?? 100) < 15) return 'high';
-  if (report.memory.freePercent === undefined && (report.memory.freeBytes ?? Number.POSITIVE_INFINITY) < 1_073_741_824) return 'high';
   if ((report.memory.freePercent ?? 100) < 25) return 'medium';
   return 'ok';
 }
@@ -190,4 +247,12 @@ function maxLevel(...levels: PressureLevel[]): PressureLevel {
   if (levels.includes('high')) return 'high';
   if (levels.includes('medium')) return 'medium';
   return 'ok';
+}
+
+function definedMemorySnapshot(snapshot: MemoryPressureSnapshot): MemoryPressureSnapshot {
+  const defined: MemoryPressureSnapshot = {};
+  for (const [key, value] of Object.entries(snapshot) as Array<[keyof MemoryPressureSnapshot, number | undefined]>) {
+    if (value !== undefined) defined[key] = value;
+  }
+  return defined;
 }

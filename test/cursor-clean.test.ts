@@ -1,4 +1,4 @@
-import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -79,11 +79,37 @@ describe('Cursor safe cleanup execution', () => {
       const result = await runCursorSafeCleanup({ env: { HOME: home }, yes: true, processList: '' });
 
       expect(result.warnings).toContain('skipped symbolic link in Cursor cleanup target');
+      expect(result.deletedBytes).toBe(20);
       await expect(readFile(path.join(outside, 'outside.txt'), 'utf8')).resolves.toBe('outside');
       await expect(lstat(path.join(cursorRoot, 'Cache', 'outside-link'))).resolves.toBeTruthy();
     } finally {
       await rm(home, { recursive: true, force: true });
       await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  test('does not count bytes for entries that failed to delete', async () => {
+    const home = await makeCursorFixture();
+    const lockedDir = path.join(cursorRootFor(home), 'Cache', 'locked');
+    try {
+      await mkdir(lockedDir);
+      await writeFile(path.join(lockedDir, 'blocked.bin'), 'blocked');
+      await chmod(lockedDir, 0o500);
+
+      const result = await runCursorSafeCleanup({ env: { HOME: home }, yes: true, processList: '' });
+
+      expect(result.status).toBe('ok');
+      expect(result.reclaimableBytes).toBe(27);
+      expect(result.deletedBytes).toBe(20);
+      expect(result.deletedBytes).toBeLessThan(result.reclaimableBytes);
+      expect(result.warnings).toEqual(expect.arrayContaining([
+        'failed to remove Cursor cleanup file',
+        'failed to remove Cursor cleanup directory'
+      ]));
+      await expect(readFile(path.join(lockedDir, 'blocked.bin'), 'utf8')).resolves.toBe('blocked');
+    } finally {
+      await chmod(lockedDir, 0o700).catch(() => undefined);
+      await rm(home, { recursive: true, force: true });
     }
   });
 

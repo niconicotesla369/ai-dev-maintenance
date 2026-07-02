@@ -13,6 +13,8 @@ describe('pressure human renderer', () => {
     expect(output).toContain('Disk used');
     expect(output).toContain('AI CPU');
     expect(output).toContain('AI RSS');
+    expect(output).toContain('Other CPU');
+    expect(output).toContain('Other RSS');
     expect(output).toContain('Processes');
     expect(output).toContain('▰');
     expect(output).toContain('What is using CPU?');
@@ -36,6 +38,8 @@ describe('pressure human renderer', () => {
     expect(output).toContain('Disk used       85%');
     expect(output).toContain('AI CPU          48.1%');
     expect(output).toContain('AI RSS          218.7 MiB');
+    expect(output).toContain('Other CPU       0.0%');
+    expect(output).toContain('Other RSS       0 B');
     expect(output).toContain('Top CPU');
     expect(output).toContain('Codex');
     expect(output).toContain('Next            No urgent pressure action detected.');
@@ -65,8 +69,12 @@ describe('pressure human renderer', () => {
       }
     ];
     input.totals = {
-      aiCpuPercent: 90,
-      aiRssBytes: 200 * 1024 * 1024,
+      aiCpuPercent: 0,
+      aiRssBytes: 0,
+      aiProcessCount: 0,
+      otherCpuPercent: 90,
+      otherRssBytes: 200 * 1024 * 1024,
+      otherProcessCount: 1,
       processCount: 1
     };
 
@@ -120,8 +128,8 @@ describe('pressure human renderer', () => {
 
 function report(): PressureReport {
   return {
-    schemaVersion: 1,
-    toolVersion: '0.2.6',
+    schemaVersion: 2,
+    toolVersion: '0.3.0',
     generatedAt: '2026-06-30T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',
@@ -167,6 +175,10 @@ function report(): PressureReport {
     totals: {
       aiCpuPercent: 48.1,
       aiRssBytes: (78816 + 90000 + 55152) * 1024,
+      aiProcessCount: 3,
+      otherCpuPercent: 0,
+      otherRssBytes: 0,
+      otherProcessCount: 0,
       processCount: 3
     },
     pressureLevel: {

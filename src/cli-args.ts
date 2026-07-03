@@ -4,6 +4,7 @@ export type ParsedCli = {
   noCommand: boolean;
   json: boolean;
   showPaths: boolean;
+  share: boolean;
   noBanner: boolean;
   plain: boolean;
   noInteractive: boolean;
@@ -22,6 +23,7 @@ export function parseCliArgs(argv: string[]): ParsedCli {
     noCommand,
     json: args.includes('--json'),
     showPaths: args.includes('--show-paths'),
+    share: args.includes('--share'),
     noBanner: args.includes('--no-banner'),
     plain: args.includes('--plain'),
     noInteractive: args.includes('--no-interactive'),
@@ -71,7 +73,7 @@ export function usageText(): string {
     '  ai-dev-maintenance --help | -h',
     '  ai-dev-maintenance --version | -v | version',
     '  ai-dev-maintenance logo [--plain]',
-    '  ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]',
+    '  ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]',
     '  ai-dev-maintenance pressure [--json] [--no-banner] [--plain]',
     '  ai-dev-maintenance cursor clean --safe [--yes]',
     '  ai-dev-maintenance fix --safe --yes',

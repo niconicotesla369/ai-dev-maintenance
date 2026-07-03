@@ -1,6 +1,6 @@
 import { formatBytes, row } from '../cli-render.js';
 import { box, colorize, meter, padVisible, truncateVisible, twoColumns } from '../ui/components.js';
-import { cpuLevelForPercent } from './levels.js';
+import { cpuLevelForCapacityPercent, cpuLevelForPercent } from './levels.js';
 import type { PressureLevel, PressureProcess, PressureReport } from './types.js';
 
 export type PressureRenderOptions = {
@@ -22,9 +22,9 @@ function renderSimplePressureReport(report: PressureReport): string {
     row('Memory free', memoryFreeText(report)),
     row('Pressure level', report.pressureLevel.overall),
     row('Disk used', report.disk.capacityPercent === undefined ? 'unknown' : `${report.disk.capacityPercent}%`),
-    row('AI CPU', `${report.totals.aiCpuPercent.toFixed(1)}%`),
+    row('AI CPU', cpuText(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent)),
     row('AI RSS', formatBytes(report.totals.aiRssBytes)),
-    row('Other CPU', `${report.totals.otherCpuPercent.toFixed(1)}%`),
+    row('Other CPU', cpuText(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent)),
     row('Other RSS', formatBytes(report.totals.otherRssBytes)),
     row('Processes', String(report.totals.processCount))
   ];
@@ -57,9 +57,9 @@ function renderPrettyPressureReport(report: PressureReport, options: PressureRen
     '',
     metricLine('Memory free', memoryFreeText(report), memoryLabel(report), memoryMeterValue(report), 100, report.pressureLevel.memory, color),
     metricLine('Disk used', diskText(report), diskLabel(report), report.disk.capacityPercent ?? 0, 100, report.pressureLevel.disk, color),
-    metricLine('AI CPU', `${report.totals.aiCpuPercent.toFixed(1)}%`, cpuLabel(report.pressureLevel.cpu), report.totals.aiCpuPercent, 100, report.pressureLevel.cpu, color),
+    metricLine('AI CPU', cpuText(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent), cpuLabel(report.pressureLevel.cpu), cpuMeterValue(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent), 100, report.pressureLevel.cpu, color),
     metricLine('AI RSS', formatBytes(report.totals.aiRssBytes), rssLabel(report.totals.aiRssBytes), report.totals.aiRssBytes, 2 * 1024 * 1024 * 1024, rssTone(report.totals.aiRssBytes), color),
-    metricLine('Other CPU', `${report.totals.otherCpuPercent.toFixed(1)}%`, otherCpuLabel(report.totals.otherCpuPercent), report.totals.otherCpuPercent, 100, cpuLevelForPercent(report.totals.otherCpuPercent), color),
+    metricLine('Other CPU', cpuText(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent), otherCpuLabel(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent), cpuMeterValue(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent), 100, cpuLevelForReportCpu(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent), color),
     metricLine('Other RSS', formatBytes(report.totals.otherRssBytes), rssLabel(report.totals.otherRssBytes), report.totals.otherRssBytes, 2 * 1024 * 1024 * 1024, rssTone(report.totals.otherRssBytes), color),
     metricLine('Processes', String(report.totals.processCount), processLabel(report.totals.processCount), report.totals.processCount, 50, processTone(report.totals.processCount), color)
   ], { width: columns, color, tone: toneForLevel(report.pressureLevel.overall) });
@@ -177,11 +177,26 @@ function cpuLabel(level: PressureLevel): string {
   return 'OK';
 }
 
-function otherCpuLabel(cpuPercent: number): string {
-  const level = cpuLevelForPercent(cpuPercent);
+function otherCpuLabel(cpuPercent: number, cpuCapacityPercent: number | undefined): string {
+  const level = cpuLevelForReportCpu(cpuPercent, cpuCapacityPercent);
   if (level === 'high') return 'HEAVY';
   if (level === 'medium') return 'BUSY';
   return 'OK';
+}
+
+function cpuText(cpuPercent: number, cpuCapacityPercent: number | undefined): string {
+  const perCore = `${cpuPercent.toFixed(1)}%`;
+  return cpuCapacityPercent === undefined ? perCore : `${perCore} (${cpuCapacityPercent.toFixed(1)}% cap)`;
+}
+
+function cpuMeterValue(cpuPercent: number, cpuCapacityPercent: number | undefined): number {
+  return cpuCapacityPercent ?? cpuPercent;
+}
+
+function cpuLevelForReportCpu(cpuPercent: number, cpuCapacityPercent: number | undefined): PressureLevel {
+  return cpuCapacityPercent === undefined
+    ? cpuLevelForPercent(cpuPercent)
+    : cpuLevelForCapacityPercent(cpuCapacityPercent);
 }
 
 function rssLabel(bytes: number): string {

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.1 - 2026-07-03
+
+- Normalize pressure CPU severity by logical CPU capacity while preserving per-core `ps` CPU totals.
+- Add `aiCpuCapacityPercent`, `otherCpuCapacityPercent`, and `logicalCpuCount` to pressure totals when available.
+- Exclude AIDM's own process and direct child processes from live pressure totals.
+- Add `doctor --share` for a public, allowlisted, path-free share card.
+- Keep cleanup logic, SQLite/WAL handling, redaction, and `fix --safe --yes` unchanged.
+
 ## 0.3.0 - 2026-07-02
 
 - Add root help support with `--help` and `-h`.

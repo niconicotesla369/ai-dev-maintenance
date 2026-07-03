@@ -1,0 +1,20 @@
++----------------------------------------------------------------------+
+| AIDM SHARE CARD                                                      |
+|                                                                      |
+| Version           v0.3.1                                             |
+| Date              2026-07-03                                         |
+|                                                                      |
+| Providers                                                            |
+| Codex         detected    46.7 MiB                                   |
+| Claude Code   detected    112.1 MiB                                  |
+| Cursor        detected    782.5 MiB                                  |
+|                                                                      |
+| Buckets                                                              |
+| Total state       941.3 MiB                                          |
+| Safe reclaimable  339.0 MiB                                          |
+| Review first      54.7 MiB                                           |
+| Private danger    547.7 MiB                                          |
+|                                                                      |
+| Private danger buckets are never auto-touched.                       |
+| Run npx --yes ai-dev-maintenance@0.3.1                               |
++----------------------------------------------------------------------+

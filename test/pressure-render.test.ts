@@ -124,6 +124,28 @@ describe('pressure human renderer', () => {
     expect(output).not.toContain('Live pressure: OK');
     expect(output).not.toContain('Reason:');
   });
+
+  test('renders CPU capacity percent without overstating multi-core CPU totals', () => {
+    const input = report();
+    input.totals = {
+      ...input.totals,
+      logicalCpuCount: 8,
+      aiCpuPercent: 10,
+      aiCpuCapacityPercent: 1.3,
+      otherCpuPercent: 160.6,
+      otherCpuCapacityPercent: 20.1
+    };
+
+    const simple = renderPressureReport(input);
+    const pretty = renderPressureReport(input, { pretty: true, color: false, columns: 120 });
+
+    expect(simple).toContain('AI CPU          10.0% (1.3% cap)');
+    expect(simple).toContain('Other CPU       160.6% (20.1% cap)');
+    expect(pretty).toContain('10.0% (1.3% cap)');
+    expect(pretty).toContain('160.6% (20.1% cap)');
+    expect(pretty).toContain('Other CPU');
+    expect(pretty).not.toContain('HEAVY');
+  });
 });
 
 function report(): PressureReport {

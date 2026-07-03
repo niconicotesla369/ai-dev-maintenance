@@ -14,6 +14,7 @@ import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
 import { renderReport } from './cli-render.js';
 import { formatBytes, row } from './cli-render.js';
+import { renderShareCard } from './share-card.js';
 import { shouldPrettyPrint } from './ui/components.js';
 import { TOOL_VERSION } from './version.js';
 import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
@@ -117,12 +118,23 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   if (parsed.command === 'doctor') {
     const flagError = unknownFlagError(
       parsed.args,
-      new Set(['--json', '--show-paths', '--no-banner', '--no-interactive', '--plain', '--wait-timeout']),
+      new Set(['--json', '--show-paths', '--share', '--no-banner', '--no-interactive', '--plain', '--wait-timeout']),
       'doctor'
     );
     if (flagError) return { exitCode: 2, output: flagError };
-    const { report, reportPath } = await commands.runDoctor({ json: parsed.json, showPaths: parsed.showPaths });
+    if (parsed.share && parsed.json) return { exitCode: 2, output: `doctor --share cannot be combined with --json.\n${usageText()}` };
+    const { report, reportPath } = await commands.runDoctor({
+      json: parsed.json,
+      showPaths: parsed.share ? false : parsed.showPaths,
+      persistReport: parsed.share ? false : undefined
+    });
     const outputReport = sanitizeReportForOutput(report);
+    if (parsed.share) {
+      return {
+        exitCode: report.status === 'unsupported' ? 2 : 0,
+        output: renderShareCard(outputReport)
+      };
+    }
     const banner = shouldShowBanner({
       json: parsed.json,
       noBanner: parsed.noBanner,

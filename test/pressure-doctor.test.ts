@@ -5,6 +5,7 @@ describe('live pressure doctor', () => {
   test('builds a redacted pressure report from command outputs', async () => {
     const report = await runPressureDoctor({
       platform: 'darwin',
+      logicalCpuCount: 8,
       run: async (command) => {
         if (command === 'ps') {
           return ok([
@@ -53,19 +54,22 @@ describe('live pressure doctor', () => {
       },
       totals: {
         aiCpuPercent: 48.1,
+        logicalCpuCount: 8,
+        aiCpuCapacityPercent: 6,
         aiRssBytes: (78816 + 90000 + 55152) * 1024,
         aiProcessCount: 3,
         otherCpuPercent: 0,
+        otherCpuCapacityPercent: 0,
         otherRssBytes: 0,
         otherProcessCount: 0,
         processCount: 3
       },
       pressureLevel: {
         overall: 'medium',
-        cpu: 'medium',
+        cpu: 'ok',
         memory: 'ok',
         disk: 'medium',
-        reasons: expect.arrayContaining(['AI CPU pressure is elevated', 'disk usage is elevated'])
+        reasons: ['disk usage is elevated']
       }
     });
     expect(report.processes.map((process) => process.provider)).toEqual(['codex', 'cursor', 'claude-code']);
@@ -76,6 +80,7 @@ describe('live pressure doctor', () => {
   test('separates AI totals from non-AI pressure noise and bumps pressure schema to v2', async () => {
     const report = await runPressureDoctor({
       platform: 'darwin',
+      logicalCpuCount: 8,
       run: async (command) => {
         if (command === 'ps') {
           return ok([
@@ -99,17 +104,140 @@ describe('live pressure doctor', () => {
     expect(report.schemaVersion).toBe(2);
     expect(report.totals).toMatchObject({
       aiCpuPercent: 12.5,
+      logicalCpuCount: 8,
+      aiCpuCapacityPercent: 1.6,
       aiRssBytes: (50000 + 80000) * 1024,
       aiProcessCount: 2,
       otherCpuPercent: 160,
+      otherCpuCapacityPercent: 20,
       otherRssBytes: (250000 + 120000) * 1024,
       otherProcessCount: 2,
       processCount: 4
     });
     expect(report.pressureLevel.cpu).toBe('ok');
     expect(report.pressureLevel.overall).toBe('ok');
-    expect(report.pressureLevel.reasons).toContain('non-AI process pressure is high');
+    expect(report.pressureLevel.reasons).not.toContain('non-AI process pressure is high');
+    expect(report.pressureLevel.reasons).not.toContain('non-AI process pressure is elevated');
     expect(report.pressureLevel.reasons).not.toContain('AI CPU pressure is high');
+  });
+
+  test('uses CPU capacity percent for pressure levels while preserving per-core CPU totals', async () => {
+    const report = await runPressureDoctor({
+      platform: 'darwin',
+      logicalCpuCount: 8,
+      run: async (command) => {
+        if (command === 'ps') {
+          return ok([
+            '101 1 10.0 0.5 50000 /Applications/Codex.app/Contents/MacOS/Codex',
+            '201 1 95.0 1.2 250000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper',
+            '202 1 65.6 0.7 120000 /System/Library/CoreServices/WindowServer'
+          ].join('\n'));
+        }
+        if (command === 'vm_stat') return ok('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 4071.');
+        if (command === 'memory_pressure') {
+          return ok('The system has 8589934592 (524288 pages with a page size of 16384).\nSystem-wide memory free percentage: 40%');
+        }
+        if (command === 'df') {
+          return ok('Filesystem Size Used Avail Capacity Mounted on\n/dev/disk3s5 228Gi 100Gi 128Gi 45% /System/Volumes/Data');
+        }
+        throw new Error(`unexpected command ${command}`);
+      }
+    });
+
+    expect(report.totals).toMatchObject({
+      logicalCpuCount: 8,
+      aiCpuPercent: 10,
+      aiCpuCapacityPercent: 1.3,
+      otherCpuPercent: 160.6,
+      otherCpuCapacityPercent: 20.1
+    });
+    expect(report.pressureLevel.cpu).toBe('ok');
+    expect(report.pressureLevel.overall).toBe('ok');
+    expect(report.pressureLevel.reasons).not.toContain('non-AI process pressure is high');
+    expect(report.pressureLevel.reasons).not.toContain('non-AI process pressure is elevated');
+  });
+
+  test('falls back to per-core CPU level when logical CPU count is unavailable', async () => {
+    const report = await runPressureDoctor({
+      platform: 'darwin',
+      logicalCpuCount: 0,
+      run: async (command) => {
+        if (command === 'ps') {
+          return ok('201 1 160.6 1.2 250000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper');
+        }
+        if (command === 'vm_stat') return ok('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 4071.');
+        if (command === 'memory_pressure') {
+          return ok('The system has 8589934592 (524288 pages with a page size of 16384).\nSystem-wide memory free percentage: 40%');
+        }
+        if (command === 'df') {
+          return ok('Filesystem Size Used Avail Capacity Mounted on\n/dev/disk3s5 228Gi 100Gi 128Gi 45% /System/Volumes/Data');
+        }
+        throw new Error(`unexpected command ${command}`);
+      }
+    });
+
+    expect(report.totals.logicalCpuCount).toBeUndefined();
+    expect(report.totals.otherCpuCapacityPercent).toBeUndefined();
+    expect(report.pressureLevel.reasons).toContain('non-AI process pressure is high');
+  });
+
+  test('classifies high AI CPU capacity as high pressure', async () => {
+    const report = await runPressureDoctor({
+      platform: 'darwin',
+      logicalCpuCount: 8,
+      run: async (command) => {
+        if (command === 'ps') {
+          return ok('101 1 480.0 0.5 50000 /Applications/Codex.app/Contents/MacOS/Codex');
+        }
+        if (command === 'vm_stat') return ok('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 4071.');
+        if (command === 'memory_pressure') {
+          return ok('The system has 8589934592 (524288 pages with a page size of 16384).\nSystem-wide memory free percentage: 40%');
+        }
+        if (command === 'df') {
+          return ok('Filesystem Size Used Avail Capacity Mounted on\n/dev/disk3s5 228Gi 100Gi 128Gi 45% /System/Volumes/Data');
+        }
+        throw new Error(`unexpected command ${command}`);
+      }
+    });
+
+    expect(report.totals.aiCpuPercent).toBe(480);
+    expect(report.totals.aiCpuCapacityPercent).toBe(60);
+    expect(report.pressureLevel.cpu).toBe('high');
+    expect(report.pressureLevel.overall).toBe('high');
+    expect(report.pressureLevel.reasons).toContain('AI CPU pressure is high');
+  });
+
+  test('excludes the current AIDM process and direct children from pressure totals', async () => {
+    const report = await runPressureDoctor({
+      platform: 'darwin',
+      logicalCpuCount: 8,
+      currentPid: 9000,
+      run: async (command) => {
+        if (command === 'ps') {
+          return ok([
+            '9000 8000 90.0 0.5 50000 node /tmp/aidm/dist/cli.js pressure',
+            '9001 9000 40.0 0.3 30000 /bin/ps -axo pid,ppid,%cpu,%mem,rss,command',
+            '101 1 10.0 0.5 50000 /Applications/Codex.app/Contents/MacOS/Codex',
+            '201 1 30.0 1.2 250000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper'
+          ].join('\n'));
+        }
+        if (command === 'vm_stat') return ok('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 4071.');
+        if (command === 'memory_pressure') {
+          return ok('The system has 8589934592 (524288 pages with a page size of 16384).\nSystem-wide memory free percentage: 40%');
+        }
+        if (command === 'df') {
+          return ok('Filesystem Size Used Avail Capacity Mounted on\n/dev/disk3s5 228Gi 100Gi 128Gi 45% /System/Volumes/Data');
+        }
+        throw new Error(`unexpected command ${command}`);
+      }
+    });
+
+    expect(report.processes.map((process) => process.pid)).toEqual([201, 101]);
+    expect(report.totals).toMatchObject({
+      aiCpuPercent: 10,
+      otherCpuPercent: 30,
+      processCount: 2
+    });
   });
 
   test('returns unsupported on non-macOS without running commands', async () => {
@@ -277,11 +405,12 @@ describe('live pressure doctor', () => {
   test('suggests Activity Monitor when non-AI processes dominate CPU pressure', async () => {
     const report = await runPressureDoctor({
       platform: 'darwin',
+      logicalCpuCount: 8,
       run: async (command) => {
         if (command === 'ps') {
           return ok([
             '101 1 5.0 0.5 50000 /Applications/Codex.app/Contents/MacOS/Codex',
-            '201 1 95.0 1.2 250000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper'
+            '201 1 480.0 1.2 250000 /Applications/Google Chrome.app/Contents/MacOS/Google Chrome Helper'
           ].join('\n'));
         }
         if (command === 'vm_stat') return ok('Mach Virtual Memory Statistics: (page size of 16384 bytes)\nPages free: 4071.');

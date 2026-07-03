@@ -117,7 +117,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.0 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.1 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -196,7 +196,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.0');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.1');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -224,6 +224,7 @@ describe('release readiness', () => {
 
     expect(pkg.files).toContain('CHANGELOG.md');
     expect(changelog).toContain('# Changelog');
+    expect(changelog).toContain('## 0.3.1 - 2026-07-03');
     expect(changelog).toContain('## 0.3.0 - 2026-07-02');
     for (const version of [
       '0.1.0',
@@ -238,6 +239,7 @@ describe('release readiness', () => {
       '0.2.4',
       '0.2.5',
       '0.2.6',
+      '0.3.1',
       '0.3.0'
     ]) {
       expect(changelog).toContain(`## ${version}`);
@@ -252,6 +254,15 @@ describe('release readiness', () => {
     expect(changelog).toContain('aiCpuPercent no longer includes non-AI processes');
   });
 
+  test('changelog documents the v0.3.1 defensible sharing changes', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(changelog).toContain('Normalize pressure CPU severity by logical CPU capacity');
+    expect(changelog).toContain('aiCpuCapacityPercent');
+    expect(changelog).toContain('Exclude AIDM');
+    expect(changelog).toContain('doctor --share');
+  });
+
   test('pressure examples stay on schema v2 with separated AI and non-AI totals', async () => {
     const example = JSON.parse(await readFile('examples/pressure.json', 'utf8'));
     const text = await readFile('examples/pressure.txt', 'utf8');
@@ -259,15 +270,31 @@ describe('release readiness', () => {
     expect(example.schemaVersion).toBe(2);
     expect(example.totals).toEqual(expect.objectContaining({
       aiCpuPercent: expect.any(Number),
+      aiCpuCapacityPercent: expect.any(Number),
       aiRssBytes: expect.any(Number),
       aiProcessCount: expect.any(Number),
       otherCpuPercent: expect.any(Number),
+      otherCpuCapacityPercent: expect.any(Number),
       otherRssBytes: expect.any(Number),
       otherProcessCount: expect.any(Number),
-      processCount: expect.any(Number)
+      processCount: expect.any(Number),
+      logicalCpuCount: expect.any(Number)
     }));
     expect(text).toContain('Other CPU');
+    expect(text).toContain('% cap');
     expect(text).toContain('Other RSS');
+  });
+
+  test('share card example stays path-free and public-safe', async () => {
+    const example = await readFile('examples/share-card.txt', 'utf8');
+
+    expect(example).toContain('AIDM SHARE CARD');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.1');
+    expect(example).toContain('Private danger buckets are never auto-touched.');
+    expect(example).not.toContain('/Users');
+    expect(example).not.toContain('<home>');
+    expect(example).not.toContain('pid');
+    expect(example).not.toContain('/');
   });
 
   test('readmes document pressure measurement sources and schema v2 semantics', async () => {
@@ -279,9 +306,12 @@ describe('release readiness', () => {
     expect(readmes).toContain('memory_pressure -Q');
     expect(readmes).toContain('100% = one logical CPU core');
     expect(readmes).toContain('100% = 1つの論理CPUコア');
+    expect(readmes).toContain('capacity-normalized CPU percentages');
+    expect(readmes).toContain('capacity正規化済みCPU%');
     expect(readmes).toContain('schemaVersion 2');
     expect(readmes).toContain('aiCpuPercent no longer includes non-AI processes');
     expect(readmes).toContain('aiCpuPercent は非AIプロセスを含みません');
+    expect(readmes).toContain('doctor --share');
   });
 
   test('public release notes do not carry stale current-series wording or duplicate migration notes', async () => {

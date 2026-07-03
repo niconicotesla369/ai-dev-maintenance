@@ -2,7 +2,7 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断するためのCLIです。
 
-v0.3.0では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、さらにガイド付き診断とread-only live pressure checkのターミナル向けpretty outputを追加しました。読みやすいprocess名、総合pressure level、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
+v0.3.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` カードを追加しました。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
 
 `doctor` は `lstat` / `readdir` によるサイズ計測と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
 
@@ -12,9 +12,11 @@ Cursor cleanup は明示実行だけです。`cursor clean --safe` はdry-run、
 
 `pressure` はディスクcleanupとは別です。ローカルprocess metadataだけを読み、AI開発関連processのCPU/RAM負荷を表示します。`Codex Renderer`、`node/vitest`、`Chrome Helper`、`syspolicyd` のような読みやすい名前を出し、分かりにくい `other` 行を減らします。processのkill、終了、再起動、suspend、renice、変更は行いません。
 
-memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします。`vm_stat` のpage情報は補助情報であり、`memory_pressure -Q` が使えない時に高memory pressureを推測するためには使いません。CPU%はmacOS `ps` と同じ per-core 合算です。`100% = 1つの論理CPUコア` なので、multi-core Macでは合計が100%を超えることがあります。
+memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします。`vm_stat` のpage情報は補助情報であり、`memory_pressure -Q` が使えない時に高memory pressureを推測するためには使いません。CPU%はmacOS `ps` と同じ per-core 合算です。`100% = 1つの論理CPUコア` なので、multi-core Macでは合計が100%を超えることがあります。論理CPU数を取得できる場合、pressure severityはcapacity正規化済みCPU%で判定し、raw `ps` 合計値も維持します。
 
 `pressure --json` は `schemaVersion 2` です。このschemaでは、`aiCpuPercent は非AIプロセスを含みません`。非AIのCPU/RAMは `otherCpuPercent` と `otherRssBytes` に分けて出します。
+
+`doctor --share` は、公開しやすいcompact cardだけを出します。local path、process名、PID、hostname、username、warning、blocked reason、日付より細かいtimestampは含めません。
 
 人間向けTTY出力では、ターミナル上で安全に使えるANSIカラー、Unicode罫線、meter、compact cardを使います。`--plain`、`--json`、`NO_COLOR=1`、CI、non-TTY、狭い幅ではscript-safeなシンプル行形式に戻ります。`npx` や `npm exec` 経由でスクショを撮ると、起動中のnpm/nodeが一時的にTop CPUへ出ることがあります。きれいに撮るならglobal install後の短いコマンドが向いています。
 
@@ -23,7 +25,7 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.3.0
+npx --yes ai-dev-maintenance@0.3.1
 ```
 
 通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
@@ -32,13 +34,13 @@ npx --yes ai-dev-maintenance@0.3.0
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -46,7 +48,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.3.0
+npm install -g ai-dev-maintenance@0.3.1
 aidm
 ```
 
@@ -57,19 +59,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -77,8 +79,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- fix --safe --yes
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。
@@ -94,7 +96,7 @@ ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--pla
 ai-dev-maintenance --help | -h
 ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
-ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
+ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
 ai-dev-maintenance pressure [--json] [--no-banner] [--plain]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
@@ -105,14 +107,14 @@ aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
-aidm doctor [--json] [--show-paths] [--no-banner]
+aidm doctor [--json] [--show-paths] [--share] [--no-banner]
 aidm pressure [--json] [--no-banner] [--plain]
 aidm cursor clean --safe [--yes]
 aidm reports prune --yes
 aidm backups prune --yes
 ```
 
-`aidm logo` はbannerだけを表示する確認用コマンドです。診断、レポート作成、filesystem変更は行いません。TTYでも従来の静的表示にしたい場合は `--no-interactive` を使います。guided modeのままbannerだけ隠す場合は `--no-banner`、ANSI色なしのシンプル行形式にする場合は `--plain` または `NO_COLOR=1` を使います。script用途では `doctor --json` または `pressure --json` を使ってください。`--show-paths` はhuman outputにだけローカル実パスを表示するため、公開issueやチャットには貼らないでください。
+`aidm logo` はbannerだけを表示する確認用コマンドです。診断、レポート作成、filesystem変更は行いません。TTYでも従来の静的表示にしたい場合は `--no-interactive` を使います。guided modeのままbannerだけ隠す場合は `--no-banner`、ANSI色なしのシンプル行形式にする場合は `--plain` または `NO_COLOR=1` を使います。script用途では `doctor --json` または `pressure --json` を使ってください。公開向けのpath-free summary cardが必要な場合は `doctor --share` を使います。`--show-paths` はhuman outputにだけローカル実パスを表示するため、公開issueやチャットには貼らないでください。
 
 ## Exit Codes
 
@@ -130,6 +132,7 @@ aidm backups prune --yes
 - `pressure` はprocess metadataだけを読みます。session本文、log本文、SQLite rows、shell history、environment variables、browser profileは読みません。
 - `pressure` はprocessのkill、終了、再起動、suspend、renice、変更を行いません。
 - `doctor` はツール用データディレクトリに伏せ字済みローカルレポートを書き込みます。
+- `doctor --share` は保存レポートよりさらに小さいallowlistだけを使い、path、process名、PID、warning、blocked reason、細かいtimestampを含めません。
 - `doctor` はClaude Codeの `projects` とCursorの `state.vscdb` をprivate/dangerとして分類し、自動では絶対に触りません。
 - `cursor clean --safe` はデフォルトではdry-runです。
 - `cursor clean --safe --yes` はCursorの安全なcache/logの中身だけを削除し、対象ディレクトリ自体は残します。
@@ -166,7 +169,7 @@ retention:
 
 伏せ字済みレポートには、対象カテゴリ、存在有無、ファイルサイズ、provider分類、コマンド状態、回収量などの高レベル情報だけを残します。ローカルマシン固有の識別子、コマンドの生出力、絶対パスは保存しません。`--show-paths` はhuman outputだけに影響し、保存済みreportは常に伏せ字済みです。
 
-出力例は `examples/logo.txt`、`examples/doctor-aggregate.txt`、`examples/cursor-clean-dry-run.txt`、`examples/guided-paused.txt`、`examples/guided-ready.txt`、`examples/fix-success.txt`、`examples/pressure.txt`、`examples/pressure.json` にあります。
+出力例は `examples/logo.txt`、`examples/doctor-aggregate.txt`、`examples/share-card.txt`、`examples/cursor-clean-dry-run.txt`、`examples/guided-paused.txt`、`examples/guided-ready.txt`、`examples/fix-success.txt`、`examples/pressure.txt`、`examples/pressure.json` にあります。
 
 ## 緊急時 / 上級者向け
 

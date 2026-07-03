@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.3.0",
+  "toolVersion": "0.3.1",
   "generatedAt": "2026-06-30T00:00:00.000Z",
   "command": "pressure",
   "status": "ok",
@@ -8,12 +8,15 @@
   "platform": "darwin",
   "totals": {
     "aiCpuPercent": 15.3,
+    "aiCpuCapacityPercent": 1.9,
     "aiRssBytes": 1363148800,
     "aiProcessCount": 3,
     "otherCpuPercent": 42.5,
+    "otherCpuCapacityPercent": 5.3,
     "otherRssBytes": 471859200,
     "otherProcessCount": 2,
-    "processCount": 5
+    "processCount": 5,
+    "logicalCpuCount": 8
   },
   "pressureLevel": {
     "overall": "medium",
@@ -21,8 +24,7 @@
     "memory": "ok",
     "disk": "medium",
     "reasons": [
-      "disk usage is elevated",
-      "non-AI process pressure is elevated"
+      "disk usage is elevated"
     ]
   },
   "memory": {
@@ -96,6 +98,6 @@
   ],
   "warnings": [],
   "nextActions": [
-    "Check Activity Monitor for non-AI apps using high CPU."
+    "Close idle browser tabs or AI tool windows before restarting the Mac."
   ]
 }

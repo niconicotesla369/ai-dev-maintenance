@@ -1,8 +1,9 @@
+import os from 'node:os';
 import { runCommand as defaultRunCommand, trustedCommandPath as defaultTrustedCommandPath } from '../commands.js';
 import type { CommandRunResult } from '../types.js';
 import { TOOL_VERSION } from '../version.js';
 import { classifyPressureProcesses } from './classify.js';
-import { cpuLevelForPercent } from './levels.js';
+import { cpuLevelForCapacityPercent, cpuLevelForPercent } from './levels.js';
 import { parseDfOutput, parseMemoryPressureOutput, parsePsOutput, parseVmStatOutput } from './parse.js';
 import type { MemoryPressureSnapshot, PressureLevel, PressureProcess, PressureReport, PressureProviderId } from './types.js';
 
@@ -16,6 +17,8 @@ export type PressureDoctorOptions = {
   run?: (command: PressureCommandName) => Promise<PressureCommandResult>;
   runCommand?: typeof defaultRunCommand;
   resolveCommandPath?: typeof defaultTrustedCommandPath;
+  logicalCpuCount?: number;
+  currentPid?: number;
 };
 
 export async function runPressureDoctor(options: PressureDoctorOptions = {}): Promise<PressureReport> {
@@ -45,7 +48,10 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     report.status = 'partial';
     report.warnings.push('ps output was truncated');
   } else {
-    report.processes = classifyPressureProcesses(parsePsOutput(ps.stdout))
+    report.processes = excludeCurrentProcessTree(
+      classifyPressureProcesses(parsePsOutput(ps.stdout)),
+      normalizedCurrentPid(options.currentPid ?? process.pid)
+    )
       .filter((process) => process.provider !== 'other' || process.cpuPercent >= 20 || process.rssBytes >= 200 * 1024 * 1024)
       .sort((a, b) => b.cpuPercent - a.cpuPercent || b.rssBytes - a.rssBytes)
       .slice(0, 25);
@@ -80,7 +86,7 @@ export async function runPressureDoctor(options: PressureDoctorOptions = {}): Pr
     report.disk = parseDfOutput(df.stdout);
   }
 
-  report.totals = pressureTotals(report.processes);
+  report.totals = pressureTotals(report.processes, normalizedLogicalCpuCount(options.logicalCpuCount ?? os.cpus().length));
   report.pressureLevel = pressureLevel(report);
   report.nextActions = nextActions(report);
   return report;
@@ -177,14 +183,21 @@ function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
 
-function pressureTotals(processes: PressureProcess[]): PressureReport['totals'] {
+function pressureTotals(processes: PressureProcess[], logicalCpuCount?: number): PressureReport['totals'] {
   const ai = processes.filter((process) => isAiProvider(process.provider));
   const other = processes.filter((process) => !isAiProvider(process.provider));
+  const aiCpuPercent = round1(ai.reduce((sum, process) => sum + process.cpuPercent, 0));
+  const otherCpuPercent = round1(other.reduce((sum, process) => sum + process.cpuPercent, 0));
   return {
-    aiCpuPercent: round1(ai.reduce((sum, process) => sum + process.cpuPercent, 0)),
+    ...(logicalCpuCount === undefined ? {} : {
+      logicalCpuCount,
+      aiCpuCapacityPercent: round1(aiCpuPercent / logicalCpuCount),
+      otherCpuCapacityPercent: round1(otherCpuPercent / logicalCpuCount)
+    }),
+    aiCpuPercent,
     aiRssBytes: ai.reduce((sum, process) => sum + process.rssBytes, 0),
     aiProcessCount: ai.length,
-    otherCpuPercent: round1(other.reduce((sum, process) => sum + process.cpuPercent, 0)),
+    otherCpuPercent,
     otherRssBytes: other.reduce((sum, process) => sum + process.rssBytes, 0),
     otherProcessCount: other.length,
     processCount: processes.length
@@ -210,11 +223,11 @@ function nextActions(report: PressureReport): string[] {
 }
 
 function pressureLevel(report: PressureReport) {
-  const cpu = cpuLevelForPercent(report.totals.aiCpuPercent);
+  const cpu = cpuLevelForReportCpu(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent);
   const memory = memoryLevel(report);
   const disk = diskLevel(report.disk.capacityPercent);
   const reasons: string[] = [];
-  const otherCpu = cpuLevelForPercent(report.totals.otherCpuPercent);
+  const otherCpu = cpuLevelForReportCpu(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent);
   if (memory === 'high') reasons.push('memory pressure is high');
   if (cpu === 'high') reasons.push('AI CPU pressure is high');
   if (disk === 'high') reasons.push('disk pressure is high');
@@ -229,6 +242,25 @@ function pressureLevel(report: PressureReport) {
     disk,
     reasons
   };
+}
+
+function cpuLevelForReportCpu(cpuPercent: number, cpuCapacityPercent: number | undefined): PressureLevel {
+  return cpuCapacityPercent === undefined
+    ? cpuLevelForPercent(cpuPercent)
+    : cpuLevelForCapacityPercent(cpuCapacityPercent);
+}
+
+function normalizedLogicalCpuCount(value: number): number | undefined {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function normalizedCurrentPid(value: number): number | undefined {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
+}
+
+function excludeCurrentProcessTree(processes: PressureProcess[], currentPid: number | undefined): PressureProcess[] {
+  if (currentPid === undefined) return processes;
+  return processes.filter((process) => process.pid !== currentPid && process.ppid !== currentPid);
 }
 
 function memoryLevel(report: PressureReport): PressureLevel {

@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.3.0 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, and adds terminal-native pretty output for the guided check and read-only live pressure check. It shows readable process names, an overall pressure level, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.3.1 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds a path-free `doctor --share` card for public posting. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -12,9 +12,11 @@ The existing Codex-only `fix --safe --yes` path remains available for SQLite WAL
 
 `pressure` is separate from disk cleanup. It reads bounded local process metadata to show which AI-development-related processes are currently using CPU and memory, with labels such as `Codex Renderer`, `node/vitest`, `Chrome Helper`, or `syspolicyd` instead of opaque `other` rows. It does not kill, quit, restart, suspend, renice, or modify any process.
 
-Memory pressure uses macOS `memory_pressure -Q` as the primary source. `vm_stat` page data is supplemental and is not used to guess high memory pressure when `memory_pressure -Q` is unavailable. CPU percentages follow macOS `ps`: `100% = one logical CPU core`, so multi-core Macs can show totals above 100%.
+Memory pressure uses macOS `memory_pressure -Q` as the primary source. `vm_stat` page data is supplemental and is not used to guess high memory pressure when `memory_pressure -Q` is unavailable. CPU percentages follow macOS `ps`: `100% = one logical CPU core`, so multi-core Macs can show totals above 100%. When the logical CPU count is available, pressure severity uses capacity-normalized CPU percentages while preserving the raw `ps` totals.
 
 `pressure --json` uses `schemaVersion 2`. In this schema, aiCpuPercent no longer includes non-AI processes; non-AI CPU/RAM is reported separately as `otherCpuPercent` and `otherRssBytes`.
+
+`doctor --share` emits a compact public card built from an explicit allowlist. It does not include local paths, process names, PIDs, hostnames, usernames, warnings, blocked reasons, or timestamps more precise than the day.
 
 Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compact cards when the terminal is wide enough. `--plain`, `--json`, `NO_COLOR=1`, CI, non-TTY output, and narrow terminals stay script-safe and use the simple row format. If you capture a screenshot through `npx` or `npm exec`, npm/node may briefly appear in Top CPU; a global install gives cleaner screenshots.
 
@@ -23,7 +25,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.3.0
+npx --yes ai-dev-maintenance@0.3.1
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -32,13 +34,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -46,7 +48,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.3.0
+npm install -g ai-dev-maintenance@0.3.1
 aidm
 ```
 
@@ -57,19 +59,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -77,8 +79,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.1 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -96,7 +98,7 @@ ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--pla
 ai-dev-maintenance --help | -h
 ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
-ai-dev-maintenance doctor [--json] [--show-paths] [--no-banner]
+ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
 ai-dev-maintenance pressure [--json] [--no-banner] [--plain]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
@@ -107,14 +109,14 @@ aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
-aidm doctor [--json] [--show-paths] [--no-banner]
+aidm doctor [--json] [--show-paths] [--share] [--no-banner]
 aidm pressure [--json] [--no-banner] [--plain]
 aidm cursor clean --safe [--yes]
 aidm reports prune --yes
 aidm backups prune --yes
 ```
 
-Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` for simple row output without ANSI color. Use `doctor --json` or `pressure --json` for scripts. `--show-paths` prints local machine paths in human output only; do not paste that output into public issues or chat logs.
+Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` for simple row output without ANSI color. Use `doctor --json` or `pressure --json` for scripts. Use `doctor --share` when you need a public, path-free summary card. `--show-paths` prints local machine paths in human output only; do not paste that output into public issues or chat logs.
 
 ## Exit Codes
 
@@ -132,6 +134,7 @@ Use `aidm logo` to print only the banner for screenshots or terminal checks. It 
 - `pressure` reads process metadata only and does not read session contents, log bodies, SQLite rows, shell history, environment variables, or browser profiles.
 - `pressure` does not kill, quit, restart, suspend, renice, or modify processes.
 - `doctor` writes a redacted local report under the tool data directory.
+- `doctor --share` uses a smaller allowlist than saved reports and does not include paths, process names, PIDs, warnings, blocked reasons, or precise timestamps.
 - `doctor` classifies Claude Code `projects` and Cursor `state.vscdb` as private/danger and never auto-touched.
 - `cursor clean --safe` is dry-run by default.
 - `cursor clean --safe --yes` removes only Cursor safe cache/log contents and preserves the safe root directories.
@@ -178,7 +181,7 @@ The saved report includes:
 - `nextSafeAction`
 
 See `examples/sample-report.json` for a schema v2 redacted multi-tool example.
-Human output examples are available in `examples/logo.txt`, `examples/doctor-aggregate.txt`, `examples/cursor-clean-dry-run.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
+Human output examples are available in `examples/logo.txt`, `examples/doctor-aggregate.txt`, `examples/share-card.txt`, `examples/cursor-clean-dry-run.txt`, `examples/guided-paused.txt`, `examples/guided-ready.txt`, and `examples/fix-success.txt`.
 Live pressure examples are available in `examples/pressure.txt` and `examples/pressure.json`.
 
 Redacted reports keep high-level target categories, existence flags, file sizes, command status, and reclaim metrics. They remove raw local-machine identifiers, raw command output, and absolute local paths. `--show-paths` affects human output only and never changes the saved redacted report.

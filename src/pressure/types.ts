@@ -71,10 +71,13 @@ export type PressureReport = {
   disk: DiskPressureSnapshot;
   processes: PressureProcess[];
   totals: {
+    logicalCpuCount?: number;
     aiCpuPercent: number;
+    aiCpuCapacityPercent?: number;
     aiRssBytes: number;
     aiProcessCount: number;
     otherCpuPercent: number;
+    otherCpuCapacityPercent?: number;
     otherRssBytes: number;
     otherProcessCount: number;
     processCount: number;

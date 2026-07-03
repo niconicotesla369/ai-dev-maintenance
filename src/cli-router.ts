@@ -14,7 +14,7 @@ import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
 import { renderReport } from './cli-render.js';
 import { formatBytes, row } from './cli-render.js';
-import { renderShareCard } from './share-card.js';
+import { renderPressureShareCard, renderShareCard } from './share-card.js';
 import { shouldPrettyPrint } from './ui/components.js';
 import { TOOL_VERSION } from './version.js';
 import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
@@ -167,9 +167,16 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   }
 
   if (parsed.command === 'pressure') {
-    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--no-banner', '--plain']), 'pressure');
+    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--share', '--no-banner', '--plain']), 'pressure');
     if (flagError) return { exitCode: 2, output: flagError };
+    if (parsed.share && parsed.json) return { exitCode: 2, output: `pressure --share cannot be combined with --json.\n${usageText()}` };
     const report = await commands.runPressureDoctor();
+    if (parsed.share) {
+      return {
+        exitCode: report.status === 'unsupported' ? 2 : 0,
+        output: renderPressureShareCard(report)
+      };
+    }
     const pretty = shouldPrettyPrint({
       json: parsed.json,
       plain: parsed.plain,

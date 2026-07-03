@@ -74,7 +74,7 @@ export function usageText(): string {
     '  ai-dev-maintenance --version | -v | version',
     '  ai-dev-maintenance logo [--plain]',
     '  ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]',
-    '  ai-dev-maintenance pressure [--json] [--no-banner] [--plain]',
+    '  ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]',
     '  ai-dev-maintenance cursor clean --safe [--yes]',
     '  ai-dev-maintenance fix --safe --yes',
     '  ai-dev-maintenance report --latest [--show-paths]',

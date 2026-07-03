@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2 - 2026-07-03
+
+- Add `pressure --share` for a public, allowlisted, process-free pressure card.
+- Keep the pressure JSON schema, live pressure diagnosis, cleanup logic, SQLite/WAL handling, and redaction unchanged.
+
 ## 0.3.1 - 2026-07-03
 
 - Normalize pressure CPU severity by logical CPU capacity while preserving per-core `ps` CPU totals.

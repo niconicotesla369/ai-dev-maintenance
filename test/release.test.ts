@@ -117,7 +117,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.1 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.2 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -196,7 +196,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.1');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.2');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -239,6 +239,7 @@ describe('release readiness', () => {
       '0.2.4',
       '0.2.5',
       '0.2.6',
+      '0.3.2',
       '0.3.1',
       '0.3.0'
     ]) {
@@ -261,6 +262,14 @@ describe('release readiness', () => {
     expect(changelog).toContain('aiCpuCapacityPercent');
     expect(changelog).toContain('Exclude AIDM');
     expect(changelog).toContain('doctor --share');
+  });
+
+  test('changelog documents the v0.3.2 pressure share card', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(changelog).toContain('pressure --share');
+    expect(changelog).toContain('process-free pressure card');
+    expect(changelog).toContain('pressure JSON schema');
   });
 
   test('pressure examples stay on schema v2 with separated AI and non-AI totals', async () => {
@@ -289,8 +298,23 @@ describe('release readiness', () => {
     const example = await readFile('examples/share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM SHARE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.1');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.2');
     expect(example).toContain('Private danger buckets are never auto-touched.');
+    expect(example).not.toContain('/Users');
+    expect(example).not.toContain('<home>');
+    expect(example).not.toContain('pid');
+    expect(example).not.toContain('/');
+  });
+
+  test('pressure share card example stays path-free and public-safe', async () => {
+    const example = await readFile('examples/pressure-share-card.txt', 'utf8');
+
+    expect(example).toContain('AIDM PRESSURE CARD');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.2 pressure');
+    expect(example).toContain('AI CPU');
+    expect(example).toContain('Other CPU');
+    expect(example).toContain('Signals');
+    expect(example).toContain('Next actions');
     expect(example).not.toContain('/Users');
     expect(example).not.toContain('<home>');
     expect(example).not.toContain('pid');
@@ -312,6 +336,7 @@ describe('release readiness', () => {
     expect(readmes).toContain('aiCpuPercent no longer includes non-AI processes');
     expect(readmes).toContain('aiCpuPercent は非AIプロセスを含みません');
     expect(readmes).toContain('doctor --share');
+    expect(readmes).toContain('pressure --share');
   });
 
   test('public release notes do not carry stale current-series wording or duplicate migration notes', async () => {
@@ -359,7 +384,7 @@ describe('release readiness', () => {
     expect(readmes).toContain('node/vitest');
     expect(readmes).toContain('terminal-native pretty output');
     expect(readmes).toContain('NO_COLOR=1');
-    expect(readmes).toContain('pressure [--json] [--no-banner] [--plain]');
+    expect(readmes).toContain('pressure [--json] [--share] [--no-banner] [--plain]');
     expect(readmes).toContain('does not kill');
     expect(readmes).toContain('processのkill');
     expect(readmes).not.toContain('pressure --kill');

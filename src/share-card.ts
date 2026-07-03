@@ -1,4 +1,5 @@
 import { formatBytes } from './cli-render.js';
+import type { PressureReport } from './pressure/types.js';
 import type { MaintenanceReport, ProviderReport } from './types.js';
 import { TOOL_VERSION } from './version.js';
 
@@ -48,6 +49,36 @@ export function renderShareCard(report: MaintenanceReport): string {
   ]);
 }
 
+export function renderPressureShareCard(report: PressureReport): string {
+  const version = safeVersion(report.toolVersion);
+  const signals = sharePressureSignals(report.pressureLevel.reasons);
+  const nextActions = sharePressureActions(report.nextActions);
+
+  return boxed([
+    'AIDM PRESSURE CARD',
+    '',
+    pairLine('Version', `v${version}`),
+    pairLine('Date', shareDate(report.generatedAt)),
+    '',
+    'Status',
+    pairLine('Pressure', report.pressureLevel.overall.toUpperCase()),
+    pairLine('Memory', report.pressureLevel.memory.toUpperCase()),
+    pairLine('Disk', report.pressureLevel.disk.toUpperCase()),
+    pairLine('AI CPU', shareCpu(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent)),
+    pairLine('Other CPU', shareCpu(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent)),
+    pairLine('AI RSS', formatBytes(safeNonNegativeNumber(report.totals.aiRssBytes))),
+    pairLine('Other RSS', formatBytes(safeNonNegativeNumber(report.totals.otherRssBytes))),
+    '',
+    'Signals',
+    ...(signals.length > 0 ? signals.map((signal) => `- ${signal}`) : ['- No urgent pressure signals.']),
+    '',
+    'Next actions',
+    ...(nextActions.length > 0 ? nextActions.map((action) => `- ${action}`) : ['- No urgent pressure action detected.']),
+    '',
+    `Run ${sharePressureCommand(version)}`
+  ]);
+}
+
 function shareProviders(providers: ProviderReport[]): Array<{
   label: string;
   present: boolean;
@@ -71,6 +102,49 @@ function shareProviders(providers: ProviderReport[]): Array<{
 
 function shareCommand(version: string): string {
   return `npx --yes ai-dev-maintenance@${version}`;
+}
+
+function sharePressureCommand(version: string): string {
+  return `${shareCommand(version)} pressure`;
+}
+
+function shareCpu(rawPercent: unknown, capacityPercent: unknown): string {
+  const raw = `${formatPercent(safeNonNegativeNumber(rawPercent))}%`;
+  const capacity = typeof capacityPercent === 'number' && Number.isFinite(capacityPercent) && capacityPercent >= 0
+    ? ` (${formatPercent(capacityPercent)}% cap)`
+    : '';
+  return `${raw}${capacity}`;
+}
+
+function formatPercent(value: number): string {
+  return value.toFixed(1);
+}
+
+function sharePressureSignals(reasons: string[]): string[] {
+  const allowed = new Map([
+    ['memory pressure is high', 'Memory pressure is high'],
+    ['AI CPU pressure is high', 'AI CPU pressure is high'],
+    ['disk pressure is high', 'Disk pressure is high'],
+    ['AI CPU pressure is elevated', 'AI CPU pressure is elevated'],
+    ['disk usage is elevated', 'Disk usage is elevated'],
+    ['non-AI process pressure is high', 'Non-AI process pressure is high'],
+    ['non-AI process pressure is elevated', 'Non-AI process pressure is elevated']
+  ]);
+  return reasons.flatMap((reason) => {
+    const signal = allowed.get(reason);
+    return signal ? [signal] : [];
+  });
+}
+
+function sharePressureActions(actions: string[]): string[] {
+  const allowed = new Set([
+    'Close idle browser tabs or AI tool windows before restarting the Mac.',
+    'Wait for the top AI process to finish, or close that app manually if it is stuck.',
+    'Run doctor to inspect disk buckets before deleting anything.',
+    'Check Activity Monitor for non-AI apps using high CPU.',
+    'No urgent pressure action detected.'
+  ]);
+  return actions.filter((action) => allowed.has(action));
 }
 
 function shareDate(generatedAt: string): string {

@@ -13,7 +13,7 @@ describe('root help CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('Usage:');
     expect(result.output).toContain('ai-dev-maintenance --help | -h');
-    expect(result.output).toContain('ai-dev-maintenance pressure [--json] [--no-banner] [--plain]');
+    expect(result.output).toContain('ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]');
     expect(result.output).not.toContain('Unknown doctor flag');
     expect(result.output).not.toContain('AI DEV MAINTENANCE');
     expect(result.output).not.toContain('AIDM SYSTEM PULSE');

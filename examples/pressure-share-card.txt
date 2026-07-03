@@ -1,0 +1,23 @@
++----------------------------------------------------------------------+
+| AIDM PRESSURE CARD                                                   |
+|                                                                      |
+| Version           v0.3.2                                             |
+| Date              2026-07-03                                         |
+|                                                                      |
+| Status                                                               |
+| Pressure          HIGH                                               |
+| Memory            OK                                                 |
+| Disk              HIGH                                               |
+| AI CPU            54.2% (6.8% cap)                                   |
+| Other CPU         119.4% (14.9% cap)                                 |
+| AI RSS            458.7 MiB                                          |
+| Other RSS         514.8 MiB                                          |
+|                                                                      |
+| Signals                                                              |
+| - Disk pressure is high                                              |
+|                                                                      |
+| Next actions                                                         |
+| - Run doctor to inspect disk buckets before deleting anything.       |
+|                                                                      |
+| Run npx --yes ai-dev-maintenance@0.3.2 pressure                      |
++----------------------------------------------------------------------+

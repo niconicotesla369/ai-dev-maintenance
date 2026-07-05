@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import { PassThrough } from 'node:stream';
 import { runCli } from '../src/cli.js';
 import { runMcpSession, serveMcpStream } from '../src/mcp/server.js';
@@ -171,6 +172,23 @@ describe('MCP stdio server', () => {
     const response = parseJsonLines(output)[0];
     expect(response.result.protocolVersion).toBe('2025-06-18');
   });
+
+  test('Claude Code MCP handshake transcript fixture matches the server wire behavior', async () => {
+    const transcript = await readTranscript('test/fixtures/mcp/claude-code-handshake.jsonl');
+    const input = lines(transcript.client.map((message) => JSON.stringify(message)));
+    const output = await runMcpSession(input, { commands: mockMcpCommands() });
+
+    expect(parseJsonLines(output)).toEqual(transcript.server);
+    const tools = transcript.server[1].result.tools.map((tool: { name: string }) => tool.name);
+    expect(tools).toEqual([
+      'aidm_doctor',
+      'aidm_pressure',
+      'aidm_report_latest',
+      'aidm_history',
+      'aidm_plan'
+    ]);
+    expect(tools).not.toContain('aidm_apply');
+  });
 });
 
 function lines(values: string[]): string {
@@ -234,12 +252,27 @@ function parseJsonLines(output: string): Array<Record<string, any>> {
     .map((line) => JSON.parse(line));
 }
 
+async function readTranscript(path: string): Promise<{
+  client: Array<Record<string, any>>;
+  server: Array<Record<string, any>>;
+}> {
+  const content = await readFile(path, 'utf8');
+  const client: Array<Record<string, any>> = [];
+  const server: Array<Record<string, any>> = [];
+  for (const line of content.trim().split(/\n/)) {
+    const entry = JSON.parse(line) as { direction: 'client' | 'server'; message: Record<string, any> };
+    if (entry.direction === 'client') client.push(entry.message);
+    else server.push(entry.message);
+  }
+  return { client, server };
+}
+
 function mockMcpCommands() {
   return {
     runDoctor: async () => ({ report: aggregateReport() }),
     runPressureDoctor: async (): Promise<PressureReport> => ({
       schemaVersion: 2,
-      toolVersion: '0.4.0-beta.3',
+      toolVersion: '0.4.0',
       generatedAt: '2026-07-04T00:00:00.000Z',
       command: 'pressure',
       status: 'ok',
@@ -273,7 +306,7 @@ function mockMcpCommands() {
     }),
     runHistory: async (): Promise<HistoryReport> => ({
       schemaVersion: 1,
-      toolVersion: '0.4.0-beta.3',
+      toolVersion: '0.4.0',
       generatedAt: '2026-07-04T00:00:00.000Z',
       command: 'history',
       status: 'ok',
@@ -293,7 +326,7 @@ function mockMcpCommands() {
     }),
     createPlan: async (): Promise<MaintenancePlanSummary> => ({
       schemaVersion: 1,
-      toolVersion: '0.4.0-beta.3',
+      toolVersion: '0.4.0',
       planId: 'plan-2026-07-04T00-00-00-000Z-abcdef',
       action: 'cursor-clean',
       status: 'ready',
@@ -322,7 +355,7 @@ function mockMcpCommands() {
 function aggregateReport(): MaintenanceReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0-beta.3',
+    toolVersion: '0.4.0',
     generatedAt: '2026-07-04T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

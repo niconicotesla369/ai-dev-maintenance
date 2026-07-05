@@ -3,5 +3,5 @@ Reason          target database is open by a process
 Target          <home>/.codex/logs_2.sqlite
 Changed         nothing; fix was blocked
 Report          <absolute-path>
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0 -- report --latest
 Next            Close AI coding tools, verify the target path, then run doctor again.

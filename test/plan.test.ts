@@ -252,7 +252,7 @@ describe('plan/apply privacy and safety', () => {
         runFixSafe: async () => ({
           report: {
             schemaVersion: 1,
-            toolVersion: '0.4.0-beta.3',
+            toolVersion: '0.4.0',
             generatedAt: '2026-07-04T00:01:00.000Z',
             command: 'fix --safe',
             status: 'ok',

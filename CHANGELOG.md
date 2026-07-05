@@ -2,14 +2,7 @@
 
 ## Unreleased
 
-## 0.4.0-beta.3 - 2026-07-06
-
-- Update aggregate doctor next-action wording for agent use: dry runs stay explicit, cleanup guidance points to `plan` and human-visible `apply`.
-- Clarify MCP `aidm_doctor` description so agents route cleanup through `aidm_plan` and a human CLI step.
-- Document that MCP doctor requests do not write reports and do not appear in local history.
-- Keep cleanup engines, SQLite/WAL handling, redaction, and safe action gates unchanged.
-
-## 0.4.0-beta.2 - 2026-07-04
+## 0.4.0 - 2026-07-06
 
 - Add JSON schema contracts and wire-compatibility fixtures for machine-readable output.
 - Add JSON output for management commands, including `fix`, Cursor cleanup, pruning, restore validation, and report retrieval.
@@ -19,6 +12,9 @@
 - Add `trust` to inspect allowlist macOS command path trust without executing those commands.
 - Add GitHub release workflow scaffolding for npm provenance publishing.
 - Harden the release workflow with tag/package version matching and OIDC-friendly npm trusted publishing.
+- Update aggregate doctor next-action wording for agent use: dry runs stay explicit, cleanup guidance points to `plan` and human-visible `apply`.
+- Clarify MCP `aidm_doctor` description so agents route cleanup through `aidm_plan` and a human CLI step.
+- Document that MCP doctor requests do not write reports and do not appear in local history.
 - Keep cleanup engines, SQLite/WAL handling, redaction, and safe action gates unchanged.
 
 ## 0.3.2 - 2026-07-03

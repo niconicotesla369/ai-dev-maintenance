@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/prune-result.v1.schema.json",
+  "title": "AIDM Retention Prune Result v1",
+  "type": "object",
+  "required": [
+    "kind",
+    "deleted",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {
+      "enum": [
+        "reports",
+        "backups"
+      ]
+    },
+    "deleted": {
+      "type": "number",
+      "minimum": 0
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

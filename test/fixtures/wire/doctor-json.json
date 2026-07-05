@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "toolVersion": "0.4.0-beta.1",
+  "generatedAt": "2026-07-03T00:00:00.000Z",
+  "command": "doctor",
+  "status": "ok",
+  "redacted": true,
+  "target": {
+    "kind": "aggregate-ai-tools",
+    "pathCategory": "<home>/ai-tool-state"
+  },
+  "findings": {
+    "targetState": {
+      "exists": true,
+      "fixable": true,
+      "blockers": [],
+      "main": {
+        "pathCategory": "codex-log-db-main",
+        "exists": true,
+        "regularFile": true,
+        "symbolicLink": false,
+        "size": 48930816
+      },
+      "wal": {
+        "pathCategory": "codex-log-db-wal",
+        "exists": true,
+        "regularFile": true,
+        "symbolicLink": false,
+        "size": 2936012
+      },
+      "shm": {
+        "pathCategory": "codex-log-db-shm",
+        "exists": true,
+        "regularFile": true,
+        "symbolicLink": false,
+        "size": 32768
+      }
+    },
+    "fixReadiness": {
+      "safe": false,
+      "reasons": [
+        "target database is open by a process"
+      ]
+    },
+    "warnings": []
+  },
+  "metrics": {},
+  "blockedReasons": [],
+  "providers": [
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "present": true,
+      "totalBytes": 48968499,
+      "buckets": {
+        "safeReclaimableBytes": 0,
+        "confirmBytes": 0,
+        "privateBytes": 48968499
+      },
+      "entries": [],
+      "advisories": []
+    },
+    {
+      "id": "claude-code",
+      "displayName": "Claude Code",
+      "present": true,
+      "totalBytes": 117650227,
+      "buckets": {
+        "safeReclaimableBytes": 0,
+        "confirmBytes": 58720256,
+        "privateBytes": 58929971
+      },
+      "entries": [],
+      "advisories": []
+    },
+    {
+      "id": "cursor",
+      "displayName": "Cursor",
+      "present": true,
+      "totalBytes": 611005235,
+      "buckets": {
+        "safeReclaimableBytes": 144388915,
+        "confirmBytes": 0,
+        "privateBytes": 466616320
+      },
+      "entries": [],
+      "advisories": []
+    }
+  ],
+  "totals": {
+    "totalBytes": 777623962,
+    "safeReclaimableBytes": 144388915,
+    "confirmBytes": 58720256,
+    "privateBytes": 574409933
+  }
+}

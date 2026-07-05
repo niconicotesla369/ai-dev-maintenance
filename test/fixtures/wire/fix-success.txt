@@ -1,0 +1,8 @@
+Diagnosis       ok
+Target          <home>/.codex/logs_2.sqlite
+Before WAL      5.0 MiB
+After WAL       0.0 MiB
+Reclaimed       5.0 MiB
+Changed         private backup + WAL cleanup
+Report          <absolute-path>
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest

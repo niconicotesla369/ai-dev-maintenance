@@ -1,0 +1,199 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/doctor-report.v2.schema.json",
+  "title": "AIDM Aggregate Doctor Report v2",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "generatedAt",
+    "command",
+    "status",
+    "redacted",
+    "target",
+    "findings",
+    "metrics",
+    "blockedReasons",
+    "providers",
+    "totals"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "toolVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command": {
+      "const": "doctor"
+    },
+    "status": {
+      "$ref": "#/definitions/reportStatus"
+    },
+    "redacted": {
+      "const": true
+    },
+    "target": {
+      "type": "object",
+      "required": [
+        "kind",
+        "pathCategory"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "enum": [
+            "aggregate-ai-tools",
+            "unknown"
+          ]
+        },
+        "pathCategory": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "findings": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "blockedReasons": {
+      "$ref": "#/definitions/stringArray"
+    },
+    "nextSafeAction": {
+      "type": "string"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/provider"
+      }
+    },
+    "totals": {
+      "$ref": "#/definitions/maintenanceTotals"
+    }
+  },
+  "definitions": {
+    "reportStatus": {
+      "enum": [
+        "ok",
+        "partial",
+        "blocked",
+        "unsupported",
+        "error"
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "maintenanceTotals": {
+      "type": "object",
+      "required": [
+        "totalBytes",
+        "safeReclaimableBytes",
+        "confirmBytes",
+        "privateBytes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "totalBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "safeReclaimableBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confirmBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "privateBytes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "required": [
+        "id",
+        "displayName",
+        "present",
+        "totalBytes",
+        "buckets",
+        "entries",
+        "advisories"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "present": {
+          "type": "boolean"
+        },
+        "totalBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "buckets": {
+          "$ref": "#/definitions/providerBuckets"
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "advisories": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "providerBuckets": {
+      "type": "object",
+      "required": [
+        "safeReclaimableBytes",
+        "confirmBytes",
+        "privateBytes"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "safeReclaimableBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "confirmBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "privateBytes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

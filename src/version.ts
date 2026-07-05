@@ -1,2 +1,3 @@
-export const TOOL_VERSION = '0.3.2';
-export const REPORT_SCHEMA_VERSION = 1;
+export const TOOL_VERSION = '0.4.0-beta.1';
+export const CODEX_REPORT_SCHEMA_VERSION = 1;
+export const REPORT_SCHEMA_VERSION = CODEX_REPORT_SCHEMA_VERSION;

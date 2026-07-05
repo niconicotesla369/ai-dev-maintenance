@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 2,
+  "toolVersion": "0.4.0-beta.1",
+  "generatedAt": "2026-07-03T00:00:00.000Z",
+  "command": "pressure",
+  "status": "ok",
+  "redacted": true,
+  "platform": "darwin",
+  "totals": {
+    "aiCpuPercent": 54.2,
+    "aiCpuCapacityPercent": 6.8,
+    "aiRssBytes": 480981811,
+    "aiProcessCount": 5,
+    "otherCpuPercent": 119.4,
+    "otherCpuCapacityPercent": 14.9,
+    "otherRssBytes": 539806925,
+    "otherProcessCount": 20,
+    "processCount": 25,
+    "logicalCpuCount": 8
+  },
+  "pressureLevel": {
+    "overall": "high",
+    "cpu": "ok",
+    "memory": "ok",
+    "disk": "high",
+    "reasons": [
+      "disk pressure is high"
+    ]
+  },
+  "memory": {
+    "freePercent": 27,
+    "pagesFree": 1000000,
+    "swapouts": 0
+  },
+  "disk": {
+    "availableBytes": 18350080000,
+    "capacityPercent": 93
+  },
+  "processes": [
+    {
+      "pid": 11767,
+      "ppid": 1,
+      "provider": "codex",
+      "category": "app",
+      "displayName": "Codex",
+      "cpuPercent": 22.5,
+      "memoryPercent": 2,
+      "rssBytes": 68262298,
+      "commandSummary": "Codex"
+    },
+    {
+      "pid": 485,
+      "ppid": 1,
+      "provider": "other",
+      "category": "system",
+      "displayName": "WindowServer",
+      "cpuPercent": 40.9,
+      "memoryPercent": 1,
+      "rssBytes": 83886080,
+      "commandSummary": "WindowServer"
+    }
+  ],
+  "warnings": [],
+  "nextActions": [
+    "Run doctor to inspect disk buckets before deleting anything."
+  ]
+}

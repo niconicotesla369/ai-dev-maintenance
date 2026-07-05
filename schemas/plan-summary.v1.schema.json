@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/plan-summary.v1.schema.json",
+  "title": "AIDM Plan Summary v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "planId",
+    "action",
+    "status",
+    "createdAt",
+    "expiresAt",
+    "identityHash",
+    "preview",
+    "blockedReasons",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "toolVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "planId": {
+      "type": "string",
+      "pattern": "^plan-"
+    },
+    "action": {
+      "enum": [
+        "codex-fix",
+        "cursor-clean"
+      ]
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "expiresAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identityHash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "targetCount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "reclaimableBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "walBytes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "blockedReasons": {
+      "$ref": "#/definitions/stringArray"
+    },
+    "warnings": {
+      "$ref": "#/definitions/stringArray"
+    }
+  },
+  "definitions": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

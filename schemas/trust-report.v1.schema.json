@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/trust-report.v1.schema.json",
+  "title": "AIDM Trust Report v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "generatedAt",
+    "command",
+    "status",
+    "redacted",
+    "entries",
+    "summary",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "toolVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command": {
+      "const": "trust"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "partial"
+      ]
+    },
+    "redacted": {
+      "const": true
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/trustEntry"
+      }
+    },
+    "summary": {
+      "$ref": "#/definitions/trustSummary"
+    },
+    "warnings": {
+      "$ref": "#/definitions/stringArray"
+    }
+  },
+  "definitions": {
+    "trustEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "path",
+        "status",
+        "reasons"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "enum": [
+            "sqlite3",
+            "lsof",
+            "ps",
+            "vm_stat",
+            "df",
+            "memory_pressure"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "trusted",
+            "untrusted",
+            "missing"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "missing",
+              "symbolic_link",
+              "not_root_owned",
+              "group_or_other_writable"
+            ]
+          }
+        }
+      }
+    },
+    "trustSummary": {
+      "type": "object",
+      "required": [
+        "trusted",
+        "untrusted",
+        "missing",
+        "total"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trusted": {
+          "type": "number",
+          "minimum": 0
+        },
+        "untrusted": {
+          "type": "number",
+          "minimum": 0
+        },
+        "missing": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

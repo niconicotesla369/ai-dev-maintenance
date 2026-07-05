@@ -72,15 +72,20 @@ export function usageText(): string {
     '  ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--no-banner] [--plain]',
     '  ai-dev-maintenance --help | -h',
     '  ai-dev-maintenance --version | -v | version',
-    '  ai-dev-maintenance logo [--plain]',
-    '  ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]',
-    '  ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]',
-    '  ai-dev-maintenance cursor clean --safe [--yes]',
-    '  ai-dev-maintenance fix --safe --yes',
-    '  ai-dev-maintenance report --latest [--show-paths]',
-    '  ai-dev-maintenance reports prune --yes',
-    '  ai-dev-maintenance backups prune --yes',
-    '  ai-dev-maintenance restore validate --backup <path>'
+  '  ai-dev-maintenance logo [--plain]',
+  '  ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]',
+  '  ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]',
+  '  ai-dev-maintenance history [--json] [--plain]',
+  '  ai-dev-maintenance trust [--json]',
+  '  ai-dev-maintenance plan codex-fix|cursor-clean [--json]',
+  '  ai-dev-maintenance apply --plan <planId> --yes [--json]',
+  '  ai-dev-maintenance mcp serve',
+  '  ai-dev-maintenance cursor clean --safe [--yes] [--json]',
+  '  ai-dev-maintenance fix --safe --yes [--json]',
+  '  ai-dev-maintenance report --latest [--show-paths] [--json]',
+  '  ai-dev-maintenance reports prune --yes [--json]',
+  '  ai-dev-maintenance backups prune --yes [--json]',
+  '  ai-dev-maintenance restore validate --backup <path> [--json]'
   ].join('\n') + '\n';
 }
 

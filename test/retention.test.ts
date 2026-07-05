@@ -155,6 +155,35 @@ describe('prune CLI commands', () => {
     expect(backups.output).toContain('Deleted backups  1');
     expect(backups.output).toContain('skipped unsafe backup-link');
   });
+
+  test('uses injected HOME for report and backup prune directories', async () => {
+    const home = '/tmp/aidm-prune-home';
+    const seen: string[] = [];
+
+    await runCli(['reports', 'prune', '--yes'], {
+      env: { HOME: home },
+      commands: {
+        pruneReports: async (dir) => {
+          seen.push(dir);
+          return { deleted: 0, warnings: [] };
+        }
+      }
+    });
+    await runCli(['backups', 'prune', '--yes'], {
+      env: { HOME: home },
+      commands: {
+        pruneBackups: async (dir) => {
+          seen.push(dir);
+          return { deleted: 0, warnings: [] };
+        }
+      }
+    });
+
+    expect(seen).toEqual([
+      path.join(home, '.ai-dev-maintenance', 'reports'),
+      path.join(home, '.ai-dev-maintenance', 'backups')
+    ]);
+  });
 });
 
 async function makePrivateDir(prefix: string): Promise<string> {

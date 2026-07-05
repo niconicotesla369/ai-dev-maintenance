@@ -1,0 +1,172 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/history-report.v1.schema.json",
+  "title": "AIDM History Report v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "generatedAt",
+    "command",
+    "status",
+    "redacted",
+    "windowDays",
+    "dataPoints",
+    "providers",
+    "totals",
+    "warnings",
+    "nextActions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "toolVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command": {
+      "const": "history"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "partial"
+      ]
+    },
+    "redacted": {
+      "const": true
+    },
+    "windowDays": {
+      "type": "number",
+      "minimum": 1
+    },
+    "dataPoints": {
+      "type": "number",
+      "minimum": 0
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/historySeries"
+      }
+    },
+    "totals": {
+      "$ref": "#/definitions/historyTotals"
+    },
+    "warnings": {
+      "$ref": "#/definitions/stringArray"
+    },
+    "nextActions": {
+      "$ref": "#/definitions/stringArray"
+    }
+  },
+  "definitions": {
+    "historyPoint": {
+      "type": "object",
+      "required": [
+        "date",
+        "totalBytes"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "totalBytes": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "historyTotals": {
+      "type": "object",
+      "required": [
+        "firstBytes",
+        "lastBytes",
+        "deltaBytes",
+        "bytesPerDay",
+        "sparkline"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "firstBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lastBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deltaBytes": {
+          "type": "number"
+        },
+        "bytesPerDay": {
+          "type": "number"
+        },
+        "sparkline": {
+          "type": "string"
+        }
+      }
+    },
+    "historySeries": {
+      "type": "object",
+      "required": [
+        "id",
+        "displayName",
+        "points",
+        "firstBytes",
+        "lastBytes",
+        "deltaBytes",
+        "bytesPerDay",
+        "sparkline"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "points": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/historyPoint"
+          }
+        },
+        "firstBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "lastBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "deltaBytes": {
+          "type": "number"
+        },
+        "bytesPerDay": {
+          "type": "number"
+        },
+        "sparkline": {
+          "type": "string"
+        }
+      }
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

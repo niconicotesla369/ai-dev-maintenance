@@ -1,0 +1,16 @@
+{
+  "status": "ready",
+  "mode": "dry-run",
+  "reclaimableBytes": 12,
+  "deletedBytes": 0,
+  "deletedEntries": 0,
+  "targets": [
+    {
+      "pathCategory": "<home>/Library/Application Support/Cursor/Cache",
+      "bytes": 12,
+      "note": "cache data"
+    }
+  ],
+  "blockedReasons": [],
+  "warnings": []
+}

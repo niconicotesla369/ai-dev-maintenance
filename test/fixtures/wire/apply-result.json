@@ -1,0 +1,14 @@
+{
+  "status": "ok",
+  "planId": "plan-2026-07-04T00-00-00-000Z-abcdef",
+  "action": "cursor-clean",
+  "applied": true,
+  "blockedReasons": [],
+  "warnings": [],
+  "result": {
+    "status": "ok",
+    "mode": "cleanup",
+    "deletedBytes": 1024,
+    "deletedEntries": 3
+  }
+}

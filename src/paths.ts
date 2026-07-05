@@ -54,7 +54,7 @@ export function defaultCodexHome(env: NodeJS.ProcessEnv = process.env): {
   codexHome: string;
   custom: boolean;
 } {
-  const defaultHome = path.join(os.homedir(), '.codex');
+  const defaultHome = path.join(resolveHome(env), '.codex');
   const candidate = env.CODEX_HOME;
   if (candidate && path.resolve(candidate) !== defaultHome) {
     return { codexHome: path.resolve(candidate), custom: true };
@@ -66,6 +66,10 @@ export function targetTriple(mainPath: string): string[] {
   return [mainPath, `${mainPath}-wal`, `${mainPath}-shm`];
 }
 
-export function appDataHome(): string {
-  return path.join(os.homedir(), '.ai-dev-maintenance');
+export function resolveHome(env: NodeJS.ProcessEnv = process.env): string {
+  return path.resolve(env.HOME || os.homedir());
+}
+
+export function appDataHome(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(resolveHome(env), '.ai-dev-maintenance');
 }

@@ -109,21 +109,40 @@ export type MaintenanceTotals = {
   privateBytes: number;
 };
 
-export type MaintenanceReport = {
-  schemaVersion: 1 | 2;
+export type ReportSchemaVersion = 1 | 2;
+export type ReportTargetKind = 'default-codex-log-db' | 'aggregate-ai-tools' | 'unknown';
+
+export type ReportEnvelope<
+  SchemaVersion extends ReportSchemaVersion,
+  TargetKind extends ReportTargetKind
+> = {
+  schemaVersion: SchemaVersion;
   toolVersion: string;
   generatedAt: string;
   command: string;
   status: ReportStatus;
   redacted: true;
   target: {
-    kind: 'default-codex-log-db' | 'aggregate-ai-tools' | 'unknown';
+    kind: TargetKind;
     pathCategory: string;
   };
   findings: Record<string, unknown>;
   metrics: Record<string, unknown>;
   blockedReasons: string[];
   nextSafeAction?: string;
+};
+
+export type CodexMaintenanceReport = ReportEnvelope<1, 'default-codex-log-db' | 'unknown'> & {
+  providers?: undefined;
+  totals?: undefined;
+};
+
+export type AggregateDoctorReport = ReportEnvelope<2, 'aggregate-ai-tools' | 'unknown'> & {
+  providers?: ProviderReport[];
+  totals?: MaintenanceTotals;
+};
+
+export type MaintenanceReport = ReportEnvelope<ReportSchemaVersion, ReportTargetKind> & {
   providers?: ProviderReport[];
   totals?: MaintenanceTotals;
 };

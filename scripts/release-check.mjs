@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -14,8 +14,10 @@ const pkg = JSON.parse(await readFile('package.json', 'utf8'));
 assertReleaseMetadata(pkg);
 assertNoInstallLifecycleScripts(pkg);
 assertPackageInvariants(pkg);
+await assertReleaseWorkflow();
 await assertVersionSync(pkg);
 await assertDistSafetyMarkers();
+await assertMcpStreamingSmoke();
 await assertNoRuntimeNetworkImports();
 await assertPackedArtifact();
 
@@ -34,6 +36,100 @@ async function assertDistSafetyMarkers() {
   ]) {
     if (!dist.includes(marker)) failures.push(`dist/cli.js is missing safety marker: ${marker}`);
   }
+}
+
+async function assertReleaseWorkflow() {
+  const workflow = await readFile('.github/workflows/release.yml', 'utf8').catch(() => '');
+  for (const marker of [
+    'id-token: write',
+    'tags:',
+    'v*',
+    'corepack pnpm run verify',
+    'corepack pnpm run build',
+    'corepack pnpm run release:check',
+    'PKG_VERSION=$(node -p',
+    'tag $VERSION != package.json $PKG_VERSION',
+    'npm publish --provenance',
+    '--tag "$NPM_TAG"'
+  ]) {
+    if (!workflow.includes(marker)) failures.push(`release workflow is missing: ${marker}`);
+  }
+}
+
+async function assertMcpStreamingSmoke() {
+  // Load-bearing protocol smoke: vitest also covers the pure transcript helper,
+  // but this spawn path is the guard that proves mcp serve responds before stdin EOF.
+  await new Promise((resolve) => {
+    const child = spawn(process.execPath, ['dist/cli.js', 'mcp', 'serve'], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let sawInitialize = false;
+    let sawTools = false;
+    const timeout = setTimeout(() => {
+      failures.push('mcp serve did not respond before stdin EOF');
+      child.kill('SIGKILL');
+      resolve();
+    }, 1_500);
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf8');
+    });
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf8');
+      const lines = stdout.trim().split(/\n/).filter(Boolean);
+      if (!sawInitialize && lines[0]) {
+        try {
+          const response = JSON.parse(lines[0]);
+          sawInitialize = response.id === 1 && response.result?.protocolVersion === '2024-11-05';
+        } catch {
+          failures.push('mcp serve initialize response is not valid JSON');
+          child.kill('SIGKILL');
+          return;
+        }
+        if (!sawInitialize) {
+          failures.push('mcp serve did not echo initialize protocolVersion');
+          child.kill('SIGKILL');
+          return;
+        }
+        child.stdin.write(`${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 2,
+          method: 'tools/list',
+          params: {}
+        })}\n`);
+      }
+      if (lines[1]) {
+        try {
+          const response = JSON.parse(lines[1]);
+          const tools = response.result?.tools ?? [];
+          sawTools = Array.isArray(tools) && tools.some((tool) => tool.name === 'aidm_plan') &&
+            !tools.some((tool) => tool.name === 'aidm_apply');
+        } catch {
+          failures.push('mcp serve tools/list response is not valid JSON');
+          child.kill('SIGKILL');
+          return;
+        }
+        child.stdin.end();
+      }
+    });
+    child.on('exit', (code) => {
+      clearTimeout(timeout);
+      if (code !== 0) failures.push(`mcp serve exited with ${code}: ${stderr}`);
+      if (!sawInitialize) failures.push('mcp serve streaming initialize smoke failed');
+      if (!sawTools) failures.push('mcp serve tools/list smoke failed');
+      resolve();
+    });
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: '2024-11-05'
+      }
+    })}\n`);
+  });
 }
 
 async function assertVersionSync(packageJson) {
@@ -93,7 +189,7 @@ function assertPackageInvariants(packageJson) {
   if (Object.keys(packageJson.dependencies ?? {}).length > 0) {
     failures.push('runtime dependencies are not allowed in v1');
   }
-  for (const required of ['dist', 'README.md', 'README.ja.md', 'SECURITY.md', 'LICENSE', 'examples']) {
+  for (const required of ['dist', 'README.md', 'README.ja.md', 'SECURITY.md', 'LICENSE', 'examples', 'schemas']) {
     if (!packageJson.files?.includes(required)) failures.push(`package files must include ${required}`);
   }
 }
@@ -132,7 +228,24 @@ async function assertPackedArtifact() {
     const parsed = JSON.parse(stdout);
     filename = parsed?.[0]?.filename;
     const files = new Set((parsed?.[0]?.files ?? []).map((file) => file.path));
-    for (const required of ['dist/cli.js', 'dist/cli.d.ts', 'README.md', 'SECURITY.md', 'LICENSE']) {
+    for (const required of [
+      'dist/cli.js',
+      'dist/cli.d.ts',
+      'README.md',
+      'SECURITY.md',
+      'LICENSE',
+      'schemas/codex-report.v1.schema.json',
+      'schemas/doctor-report.v2.schema.json',
+      'schemas/pressure-report.v2.schema.json',
+      'schemas/report-latest.v1.schema.json',
+      'schemas/cursor-clean-result.v1.schema.json',
+      'schemas/prune-result.v1.schema.json',
+      'schemas/restore-validate-result.v1.schema.json',
+      'schemas/history-report.v1.schema.json',
+      'schemas/plan-summary.v1.schema.json',
+      'schemas/apply-result.v1.schema.json',
+      'schemas/trust-report.v1.schema.json'
+    ]) {
       if (!files.has(required)) failures.push(`packed artifact is missing ${required}`);
     }
     for (const file of files) {

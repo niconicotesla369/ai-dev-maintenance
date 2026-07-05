@@ -3,6 +3,15 @@ import { runFixSafe as defaultRunFixSafe } from './fix.js';
 import { runCursorSafeCleanup as defaultRunCursorSafeCleanup } from './cursor-clean.js';
 import { runPressureDoctor as defaultRunPressureDoctor } from './pressure/doctor.js';
 import { renderPressureReport } from './pressure/render.js';
+import { buildHistoryReport as defaultBuildHistoryReport, renderHistoryReport } from './history.js';
+import { renderTrustReport, runTrust as defaultRunTrust } from './trust.js';
+import {
+  applyMaintenancePlan as defaultApplyMaintenancePlan,
+  createMaintenancePlan as defaultCreateMaintenancePlan,
+  renderApplyResult,
+  renderPlanSummary
+} from './plan.js';
+import { runMcpSession, serveMcpStream } from './mcp/server.js';
 import { appDataHome, redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup as defaultValidateRestoreBackup } from './restore.js';
@@ -26,8 +35,16 @@ export type CliResult = {
   outputAlreadyWritten?: boolean;
 };
 
+type RunDoctorCommand = (options?: {
+  json?: boolean;
+  showPaths?: boolean;
+  persistReport?: boolean;
+  platform?: NodeJS.Platform;
+  env?: NodeJS.ProcessEnv;
+}) => Promise<{ report: MaintenanceReport; reportPath?: string }>;
+
 export type CliCommands = {
-  runDoctor: typeof defaultRunDoctor;
+  runDoctor: RunDoctorCommand;
   runFixSafe: typeof defaultRunFixSafe;
   latestReport: typeof defaultLatestReport;
   validateRestoreBackup: typeof defaultValidateRestoreBackup;
@@ -35,6 +52,10 @@ export type CliCommands = {
   pruneBackups: typeof defaultPruneBackups;
   runCursorSafeCleanup: typeof defaultRunCursorSafeCleanup;
   runPressureDoctor: typeof defaultRunPressureDoctor;
+  runHistory: typeof defaultBuildHistoryReport;
+  runTrust: typeof defaultRunTrust;
+  createPlan: typeof defaultCreateMaintenancePlan;
+  applyPlan: typeof defaultApplyMaintenancePlan;
 };
 
 export type CliRuntimeOptions = {
@@ -59,6 +80,10 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     pruneBackups: defaultPruneBackups,
     runCursorSafeCleanup: defaultRunCursorSafeCleanup,
     runPressureDoctor: defaultRunPressureDoctor,
+    runHistory: defaultBuildHistoryReport,
+    runTrust: defaultRunTrust,
+    createPlan: defaultCreateMaintenancePlan,
+    applyPlan: defaultApplyMaintenancePlan,
     ...runtime.commands
   };
   const io = normalizeCliIo(runtime.io);
@@ -155,15 +180,21 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     const { report, reportPath } = await commands.runFixSafe();
     const outputReport = sanitizeReportForOutput(report);
     const exitCode = report.status === 'ok' ? 0 : 3;
-    return { exitCode, output: renderReport(outputReport, reportPath, parsed.showPaths) };
+    return {
+      exitCode,
+      output: parsed.json ? jsonOutput(outputReport) : renderReport(outputReport, reportPath, parsed.showPaths)
+    };
   }
 
   if (parsed.command === 'cursor' && parsed.args[0] === 'clean' && parsed.args.includes('--safe')) {
-    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--safe', '--yes']), 'cursor clean');
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--safe', '--yes', '--json']), 'cursor clean');
     if (flagError) return { exitCode: 2, output: flagError };
     const result = await commands.runCursorSafeCleanup({ env, yes: parsed.args.includes('--yes') });
     const exitCode = result.status === 'blocked' ? 3 : 0;
-    return { exitCode, output: renderCursorCleanupResult(result) };
+    return {
+      exitCode,
+      output: parsed.json ? jsonOutput(cursorCleanupJsonResult(result)) : renderCursorCleanupResult(result)
+    };
   }
 
   if (parsed.command === 'pressure') {
@@ -196,8 +227,96 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     };
   }
 
+  if (parsed.command === 'history') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--json', '--plain']), 'history');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const report = await commands.runHistory({ env });
+    return {
+      exitCode: 0,
+      output: parsed.json ? jsonOutput(report) : renderHistoryReport(report)
+    };
+  }
+
+  if (parsed.command === 'trust') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--json']), 'trust');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const report = await commands.runTrust();
+    return {
+      exitCode: report.status === 'ok' ? 0 : 3,
+      output: parsed.json ? jsonOutput(report) : renderTrustReport(report)
+    };
+  }
+
+  if (parsed.command === 'plan') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--json']), 'plan');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const action = parsed.args.find((arg) => !arg.startsWith('-'));
+    if (action !== 'codex-fix' && action !== 'cursor-clean') {
+      return { exitCode: 2, output: `Unknown plan action: ${action ?? '<missing>'}\n${usageText()}` };
+    }
+    const summary = await commands.createPlan({ action, env });
+    return {
+      exitCode: summary.status === 'ready' ? 0 : 3,
+      output: parsed.json ? jsonOutput(summary) : renderPlanSummary(summary)
+    };
+  }
+
+  if (parsed.command === 'apply') {
+    const flagError = unknownFlagError(parsed.args, new Set(['--plan', '--yes', '--json']), 'apply');
+    if (flagError) return { exitCode: 2, output: flagError };
+    if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
+    const plan = parsed.args[parsed.args.indexOf('--plan') + 1];
+    if (!plan || plan.startsWith('-')) return { exitCode: 2, output: `Missing --plan <planId>.\n${usageText()}` };
+    const result = await commands.applyPlan({ planId: plan, env });
+    return {
+      exitCode: result.status === 'ok' ? 0 : 3,
+      output: parsed.json ? jsonOutput(result) : renderApplyResult(result)
+    };
+  }
+
+  if (parsed.command === 'mcp' && parsed.args[0] === 'serve') {
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(), 'mcp serve');
+    if (flagError) return { exitCode: 2, output: flagError };
+    if (io.isInputTty || io.isOutputTty) {
+      return {
+        exitCode: 2,
+        output: 'MCP stdio server requires piped input/output. Example: aidm mcp serve\n'
+      };
+    }
+    if (runtime.io?.input !== undefined) {
+      return {
+        exitCode: 0,
+        output: await runMcpSession(runtime.io.input, {
+          env,
+          commands: {
+            runDoctor: commands.runDoctor,
+            runPressureDoctor: commands.runPressureDoctor,
+            latestReport: commands.latestReport,
+            runHistory: commands.runHistory,
+            createPlan: commands.createPlan
+          }
+        })
+      };
+    }
+    await serveMcpStream(process.stdin, process.stdout, {
+      env,
+      commands: {
+        runDoctor: commands.runDoctor,
+        runPressureDoctor: commands.runPressureDoctor,
+        latestReport: commands.latestReport,
+        runHistory: commands.runHistory,
+        createPlan: commands.createPlan
+      }
+    });
+    return {
+      exitCode: 0,
+      output: '',
+      outputAlreadyWritten: true
+    };
+  }
+
   if (parsed.command === 'report' && parsed.args.includes('--latest')) {
-    const flagError = unknownFlagError(parsed.args, new Set(['--latest', '--show-paths', '--unredacted']), 'report');
+    const flagError = unknownFlagError(parsed.args, new Set(['--latest', '--show-paths', '--json', '--unredacted']), 'report');
     if (flagError) return { exitCode: 2, output: flagError };
     if (parsed.args.includes('--unredacted')) {
       return { exitCode: 2, output: '--unredacted is not supported in v1.\n' };
@@ -205,34 +324,49 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     const latest = await commands.latestReport();
     if (!latest) return { exitCode: 1, output: 'No report found.\n' };
     const includePath = parsed.args.includes('--show-paths');
-    const payload = latest.report;
+    const payload = sanitizeReportForOutput(latest.report);
+    if (parsed.json) {
+      return {
+        exitCode: 0,
+        output: `${JSON.stringify({
+          reportPath: includePath ? latest.path : redactPath(latest.path),
+          report: payload
+        }, null, 2)}\n`
+      };
+    }
     const pathLine = includePath ? `Report: ${latest.path}\n` : '';
     return { exitCode: 0, output: includePath ? `${pathLine}${JSON.stringify(payload, null, 2)}\n` : renderReport(latest.report, latest.path) };
   }
 
   if (parsed.command === 'restore' && parsed.args[0] === 'validate') {
-    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--backup']), 'restore validate');
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--backup', '--json']), 'restore validate');
     if (flagError) return { exitCode: 2, output: flagError };
     const backup = parsed.args[parsed.args.indexOf('--backup') + 1];
     if (!backup || backup === parsed.args[0]) return { exitCode: 2, output: 'Missing --backup <path>.\n' };
     const result = await commands.validateRestoreBackup(backup);
-    return { exitCode: result.valid ? 0 : 3, output: `${JSON.stringify(result, null, 2)}\n` };
+    return { exitCode: result.valid ? 0 : 3, output: jsonOutput(result) };
   }
 
   if (parsed.command === 'reports' && parsed.args[0] === 'prune') {
-    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes']), 'reports prune');
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes', '--json']), 'reports prune');
     if (flagError) return { exitCode: 2, output: flagError };
     if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
-    const result = await commands.pruneReports(path.join(appDataHome(), 'reports'));
-    return { exitCode: result.warnings.length > 0 ? 3 : 0, output: renderPruneResult('reports', result) };
+    const result = await commands.pruneReports(path.join(appDataHome(env), 'reports'));
+    return {
+      exitCode: result.warnings.length > 0 ? 3 : 0,
+      output: parsed.json ? jsonOutput({ kind: 'reports', ...result }) : renderPruneResult('reports', result)
+    };
   }
 
   if (parsed.command === 'backups' && parsed.args[0] === 'prune') {
-    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes']), 'backups prune');
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--yes', '--json']), 'backups prune');
     if (flagError) return { exitCode: 2, output: flagError };
     if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
-    const result = await commands.pruneBackups(path.join(appDataHome(), 'backups'));
-    return { exitCode: result.warnings.length > 0 ? 3 : 0, output: renderPruneResult('backups', result) };
+    const result = await commands.pruneBackups(path.join(appDataHome(env), 'backups'));
+    return {
+      exitCode: result.warnings.length > 0 ? 3 : 0,
+      output: parsed.json ? jsonOutput({ kind: 'backups', ...result }) : renderPruneResult('backups', result)
+    };
   }
 
   return {
@@ -273,7 +407,7 @@ function renderPruneResult(kind: 'reports' | 'backups', result: { deleted: numbe
 }
 
 export function fixSafeConfirmationError(args: string[]): string | undefined {
-  const allowed = new Set(['--safe', '--yes']);
+  const allowed = new Set(['--safe', '--yes', '--json']);
   const unknown = args.filter((arg) => arg.startsWith('-') && !allowed.has(arg));
   if (unknown.length > 0) return `Unknown fix flag: ${unknown.join(', ')}\n${usageText()}`;
   if (args.includes('--yes')) return undefined;
@@ -284,6 +418,43 @@ export function fixSafeConfirmationError(args: string[]): string | undefined {
     'Run again only after reviewing doctor output:',
     `npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- fix --safe --yes`
   ].join('\n') + '\n';
+}
+
+function jsonOutput(value: unknown): string {
+  return `${JSON.stringify(redactJsonValue(value), null, 2)}\n`;
+}
+
+function cursorCleanupJsonResult(result: Awaited<ReturnType<typeof defaultRunCursorSafeCleanup>>) {
+  return {
+    status: result.status,
+    mode: result.mode,
+    reclaimableBytes: result.reclaimableBytes,
+    deletedBytes: result.deletedBytes,
+    deletedEntries: result.deletedEntries,
+    targets: result.targets.map((target) => ({
+      pathCategory: target.pathCategory,
+      bytes: target.bytes,
+      note: target.note
+    })),
+    blockedReasons: result.blockedReasons,
+    warnings: result.warnings
+  };
+}
+
+function redactJsonValue(value: unknown): unknown {
+  if (typeof value === 'string') return redactPath(value);
+  if (Array.isArray(value)) return value.map((entry) => redactJsonValue(entry));
+  if (!isPlainObject(value)) return value;
+
+  const output: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    output[key] = redactJsonValue(child);
+  }
+  return output;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype;
 }
 
 function shouldUseGuidedMode(

@@ -2,7 +2,7 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断するためのCLIです。
 
-v0.3.2では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
+v0.4.0-beta.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
 
 `doctor` は `lstat` / `readdir` によるサイズ計測と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
 
@@ -25,7 +25,7 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.3.2
+npx --yes ai-dev-maintenance@0.4.0-beta.1
 ```
 
 通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
@@ -34,13 +34,13 @@ npx --yes ai-dev-maintenance@0.3.2
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -48,7 +48,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.3.2
+npm install -g ai-dev-maintenance@0.4.0-beta.1
 aidm
 ```
 
@@ -59,19 +59,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -79,8 +79,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- fix --safe --yes
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。
@@ -98,23 +98,66 @@ ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
 ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
 ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]
+ai-dev-maintenance history [--json] [--plain]
+ai-dev-maintenance trust [--json]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
+ai-dev-maintenance restore validate --backup <path>
+ai-dev-maintenance plan codex-fix|cursor-clean [--json]
+ai-dev-maintenance apply --plan <planId> --yes [--json]
+ai-dev-maintenance mcp serve
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
 aidm doctor [--json] [--show-paths] [--share] [--no-banner]
 aidm pressure [--json] [--share] [--no-banner] [--plain]
+aidm history [--json] [--plain]
+aidm trust [--json]
 aidm cursor clean --safe [--yes]
+aidm fix --safe --yes
+aidm report --latest [--show-paths]
 aidm reports prune --yes
 aidm backups prune --yes
+aidm restore validate --backup <path>
+aidm plan codex-fix|cursor-clean [--json]
+aidm apply --plan <planId> --yes [--json]
+aidm mcp serve
 ```
 
 `aidm logo` はbannerだけを表示する確認用コマンドです。診断、レポート作成、filesystem変更は行いません。TTYでも従来の静的表示にしたい場合は `--no-interactive` を使います。guided modeのままbannerだけ隠す場合は `--no-banner`、ANSI色なしのシンプル行形式にする場合は `--plain` または `NO_COLOR=1` を使います。script用途では `doctor --json` または `pressure --json` を使ってください。公開向けのpath-free summary cardが必要な場合は `doctor --share` または `pressure --share` を使います。`--show-paths` はhuman outputにだけローカル実パスを表示するため、公開issueやチャットには貼らないでください。
+
+`plan` と `apply` は、外部harnessが実行前に明示レビューを挟むためのローカル二相プロトコルです。`plan codex-fix` と `plan cursor-clean` は、ツール用データディレクトリにprivateなローカルplanファイルを作るだけです。`apply --plan <planId> --yes` はidentityを再確認してから既存のsafe engineを呼び出します。`fix --safe` やCursor cleanupの安全gateを迂回しません。
+
+実験的なMCP server:
+
+```bash
+ai-dev-maintenance mcp serve
+```
+
+MCP serverは、ローカルagent harness向けのstdio-only JSON-RPC endpointです。ネットワーク、socket、HTTP serverは開きません。公開するtoolは `aidm_doctor`、`aidm_pressure`、`aidm_report_latest`、`aidm_history`、`aidm_plan` です。`aidm_apply` は公開しません。planの適用は、`aidm apply --plan <planId> --yes` を使う明示的なCLI操作のままです。`aidm_plan` はprivateなローカル `0600` planファイルを作るだけで、cleanupは実行しません。
+
+`aidm trust` はread-onlyのallowlist binary信頼状態チェックです。AIDMが利用するmacOS system commandが、期待されるroot所有、非symlink、group/other writableではないpathに存在するかを表示します。これらのcommand自体は実行しません。
+allowlist commandが欠落している、または信頼できない場合、`aidm trust` はexit code `3` を返します。
+
+## Agent / MCP Usage
+
+Claude CodeへAIDMを登録する場合は、stdio commandとして次のように追加できます。
+
+```bash
+claude mcp add aidm -- aidm mcp serve
+```
+
+MCP surfaceは実験的かつread-onlyです。診断、pressure、最新レポート、history、plan作成だけを提供します。applyやcleanup実行は提供しません。planを実行するには、引き続き人間が見えるCLI手順が必要です。
+
+```bash
+aidm apply --plan <planId> --yes
+```
+
+MCP requestは直列処理です。重いローカル診断中は、同じsession内の後続応答が遅れる場合があります。これはbeta serverの既知特性であり、background workerやnetwork listenerを増やさないための設計です。
 
 ## Exit Codes
 
@@ -123,7 +166,7 @@ aidm backups prune --yes
 | `0` | コマンド成功。read-only check、`--help`、`--version` を含みます。 |
 | `1` | `report --latest` のように要求されたローカルデータがまだ存在しない場合、または unexpected runtime error が発生した場合。 |
 | `2` | usage error、unsupported platform、不正なflag、不正なargument。 |
-| `3` | safe action が blocked、実行が安全ではない、または確認すべきwarning付きで完了した場合。 |
+| `3` | safe action が blocked、実行が安全ではない、`trust` が信頼できないallowlist commandを検出した、または確認すべきwarning付きで完了した場合。 |
 
 ## 安全方針
 
@@ -133,6 +176,8 @@ aidm backups prune --yes
 - `pressure` はprocessのkill、終了、再起動、suspend、renice、変更を行いません。
 - `doctor` はツール用データディレクトリに伏せ字済みローカルレポートを書き込みます。
 - `doctor --share` と `pressure --share` は、保存レポートやhuman dashboardよりさらに小さいallowlistだけを使い、path、process名、PID、warning、blocked reason、細かいtimestampを含めません。
+- `mcp serve` はstdio-onlyで、network listenerを持たず、`aidm_apply` を公開しません。
+- `trust` はallowlist command pathをlstat確認するだけで、system commandを実行しません。
 - `doctor` はClaude Codeの `projects` とCursorの `state.vscdb` をprivate/dangerとして分類し、自動では絶対に触りません。
 - `cursor clean --safe` はデフォルトではdry-runです。
 - `cursor clean --safe --yes` はCursorの安全なcache/logの中身だけを削除し、対象ディレクトリ自体は残します。
@@ -190,6 +235,13 @@ corepack pnpm run build
 ```
 
 runtime dependencyとinstall-time package lifecycle scriptはありません。
+
+release workflow:
+
+- `v*` tag pushでGitHub release workflowが実行されます
+- pre-release versionはnpm dist-tag `next` でpublishします
+- stable versionはnpm dist-tag `latest` でpublishします
+- npm provenance publishingを使うには、このrepositoryをnpm Trusted Publishersに設定する必要があります
 
 ## ローカルデータ
 

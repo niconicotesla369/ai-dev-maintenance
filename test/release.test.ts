@@ -35,6 +35,7 @@ describe('release readiness', () => {
     expect(releaseCheck).toContain('assertNoInstallLifecycleScripts');
     expect(releaseCheck).toContain('assertVersionSync');
     expect(releaseCheck).toContain('assertDistSafetyMarkers');
+    expect(releaseCheck).toContain('assertMcpStreamingSmoke');
     expect(releaseCheck).toContain('ai-dev-maintenance');
     expect(releaseCheck).toContain('bin.aidm must point to dist/cli.js');
     expect(releaseCheck).toContain('listSourceFiles');
@@ -53,6 +54,35 @@ describe('release readiness', () => {
     expect(workflow.indexOf('corepack enable')).toBeLessThan(
       workflow.indexOf('corepack pnpm install --frozen-lockfile --ignore-scripts')
     );
+  });
+
+  test('ci tests supported LTS and current Node versions', async () => {
+    const workflow = await readFile('.github/workflows/ci.yml', 'utf8');
+
+    expect(workflow).toContain('node-version: [20, 22, 24]');
+  });
+
+  test('release workflow publishes from version tags with npm provenance', async () => {
+    const workflow = await readFile('.github/workflows/release.yml', 'utf8');
+
+    expect(workflow).toContain('tags:');
+    expect(workflow).toContain('v*');
+    expect(workflow).toContain('id-token: write');
+    expect(workflow).toContain('npm publish --provenance');
+    expect(workflow).toContain('PKG_VERSION=$(node -p');
+    expect(workflow).toContain('tag $VERSION != package.json $PKG_VERSION');
+    expect(workflow).toContain('corepack pnpm run verify');
+    expect(workflow).toContain('corepack pnpm run release:check');
+  });
+
+  test('release check guards the release workflow contract', async () => {
+    const releaseCheck = await readFile('scripts/release-check.mjs', 'utf8');
+
+    expect(releaseCheck).toContain('assertReleaseWorkflow');
+    expect(releaseCheck).toContain('npm publish --provenance');
+    expect(releaseCheck).toContain('id-token: write');
+    expect(releaseCheck).toContain('PKG_VERSION=$(node -p');
+    expect(releaseCheck).toContain('tag $VERSION != package.json $PKG_VERSION');
   });
 
   test('ci tarball smoke reads pack json from a file instead of a fragile pipe', async () => {
@@ -117,7 +147,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.3.2 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -196,7 +226,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.3.2');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.0-beta.1');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -216,6 +246,8 @@ describe('release readiness', () => {
     expect(readmes).toContain('usage');
     expect(readmes).toContain('blocked');
     expect(readmes).toContain('unexpected runtime error');
+    expect(readmes).toContain('trust');
+    expect(readmes).toContain('untrusted');
   });
 
   test('package publishes the changelog with the npm artifact', async () => {
@@ -224,6 +256,8 @@ describe('release readiness', () => {
 
     expect(pkg.files).toContain('CHANGELOG.md');
     expect(changelog).toContain('# Changelog');
+    expect(changelog).toContain('## Unreleased');
+    expect(changelog).toContain('## 0.4.0-beta.1 - 2026-07-04');
     expect(changelog).toContain('## 0.3.1 - 2026-07-03');
     expect(changelog).toContain('## 0.3.0 - 2026-07-02');
     for (const version of [
@@ -239,6 +273,7 @@ describe('release readiness', () => {
       '0.2.4',
       '0.2.5',
       '0.2.6',
+      '0.4.0-beta.1',
       '0.3.2',
       '0.3.1',
       '0.3.0'
@@ -272,6 +307,17 @@ describe('release readiness', () => {
     expect(changelog).toContain('pressure JSON schema');
   });
 
+  test('changelog documents the v0.4.0-beta.1 delegation release', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(changelog).toContain('0.4.0-beta.1');
+    expect(changelog).toContain('MCP');
+    expect(changelog).toContain('plan');
+    expect(changelog).toContain('apply');
+    expect(changelog).toContain('trust');
+    expect(changelog).toContain('npm provenance');
+  });
+
   test('pressure examples stay on schema v2 with separated AI and non-AI totals', async () => {
     const example = JSON.parse(await readFile('examples/pressure.json', 'utf8'));
     const text = await readFile('examples/pressure.txt', 'utf8');
@@ -298,7 +344,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM SHARE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.2');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.1');
     expect(example).toContain('Private danger buckets are never auto-touched.');
     expect(example).not.toContain('/Users');
     expect(example).not.toContain('<home>');
@@ -310,7 +356,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/pressure-share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM PRESSURE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.3.2 pressure');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.1 pressure');
     expect(example).toContain('AI CPU');
     expect(example).toContain('Other CPU');
     expect(example).toContain('Signals');
@@ -319,6 +365,16 @@ describe('release readiness', () => {
     expect(example).not.toContain('<home>');
     expect(example).not.toContain('pid');
     expect(example).not.toContain('/');
+  });
+
+  test('history example stays on the read-only report history contract', async () => {
+    const example = await readFile('examples/history.txt', 'utf8');
+
+    expect(example).toContain('AIDM HISTORY');
+    expect(example).toContain('Data points');
+    expect(example).toContain('Total state');
+    expect(example).toContain('Run doctor again in a few days');
+    expect(example).not.toContain('/Users');
   });
 
   test('readmes document pressure measurement sources and schema v2 semantics', async () => {
@@ -343,7 +399,7 @@ describe('release readiness', () => {
     const readme = await readFile('README.md', 'utf8');
     const changelog = await readFile('CHANGELOG.md', 'utf8');
 
-    expect(readme).toContain('v0.3.x currently supports macOS only');
+    expect(readme).toContain('v0.4.x currently supports macOS only');
     expect(readme).not.toContain('v0.2.x currently supports macOS only');
     expect(countOccurrences(readme, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
     expect(countOccurrences(changelog, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
@@ -388,6 +444,49 @@ describe('release readiness', () => {
     expect(readmes).toContain('does not kill');
     expect(readmes).toContain('processのkill');
     expect(readmes).not.toContain('pressure --kill');
+  });
+
+  test('readmes document the experimental read-only MCP surface', async () => {
+    const readmes = [
+      await readFile('README.md', 'utf8'),
+      await readFile('README.ja.md', 'utf8')
+    ].join('\n');
+
+    expect(readmes).toContain('ai-dev-maintenance history [--json] [--plain]');
+    expect(readmes).toContain('ai-dev-maintenance trust [--json]');
+    expect(readmes).toContain('ai-dev-maintenance plan codex-fix|cursor-clean [--json]');
+    expect(readmes).toContain('ai-dev-maintenance apply --plan <planId> --yes [--json]');
+    expect(readmes).toContain('ai-dev-maintenance mcp serve');
+    expect(readmes).toContain('aidm mcp serve');
+    expect(readmes).toContain('allowlist');
+    expect(readmes).toContain('信頼状態');
+    expect(readmes).toContain('MCP');
+    expect(readmes).toContain('stdio-only');
+    expect(readmes).toContain('aidm_doctor');
+    expect(readmes).toContain('aidm_pressure');
+    expect(readmes).toContain('aidm_report_latest');
+    expect(readmes).toContain('aidm_history');
+    expect(readmes).toContain('aidm_plan');
+    expect(readmes).toContain('aidm_apply');
+    expect(readmes).toContain('does not expose');
+    expect(readmes).toContain('公開しません');
+    expect(readmes).toContain('No network, socket, or HTTP server');
+    expect(readmes).toContain('ネットワーク、socket、HTTP server');
+    expect(readmes).toContain('claude mcp add aidm -- aidm mcp serve');
+    expect(readmes).toContain('MCP requests are handled serially');
+    expect(readmes).toContain('MCP requestは直列処理');
+  });
+
+  test('readmes document release workflow provenance posture', async () => {
+    const readmes = [
+      await readFile('README.md', 'utf8'),
+      await readFile('README.ja.md', 'utf8')
+    ].join('\n');
+
+    expect(readmes).toContain('npm provenance');
+    expect(readmes).toContain('Trusted Publishers');
+    expect(readmes).toContain('dist-tag `next`');
+    expect(readmes).toContain('dist-tag `latest`');
   });
 
   test('public readmes do not publish raw wildcard deletion cleanup commands', async () => {

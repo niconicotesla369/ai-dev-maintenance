@@ -1,7 +1,7 @@
 import { lstat } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { scanPathSize } from '../fs-size.js';
+import { resolveHome } from '../paths.js';
 import { TOOL_VERSION } from '../version.js';
 import type { MaintenanceProvider, ProviderRuntimeOptions, Reclaimability, StateCategory, StateEntry } from './types.js';
 
@@ -90,7 +90,7 @@ async function scanEntry(spec: ReturnType<typeof entrySpec>): Promise<StateEntry
 }
 
 function claudeRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return path.join(env.HOME || os.homedir(), '.claude');
+  return path.join(resolveHome(env), '.claude');
 }
 
 async function exists(filePath: string): Promise<boolean> {

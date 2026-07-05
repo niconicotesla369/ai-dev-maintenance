@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.3.2 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.4.0-beta.1 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -25,7 +25,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.3.2
+npx --yes ai-dev-maintenance@0.4.0-beta.1
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -34,13 +34,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -48,7 +48,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.3.2
+npm install -g ai-dev-maintenance@0.4.0-beta.1
 aidm
 ```
 
@@ -59,19 +59,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -79,8 +79,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.3.2 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -100,23 +100,66 @@ ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
 ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
 ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]
+ai-dev-maintenance history [--json] [--plain]
+ai-dev-maintenance trust [--json]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
 ai-dev-maintenance report --latest [--show-paths]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
+ai-dev-maintenance restore validate --backup <path>
+ai-dev-maintenance plan codex-fix|cursor-clean [--json]
+ai-dev-maintenance apply --plan <planId> --yes [--json]
+ai-dev-maintenance mcp serve
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
 aidm doctor [--json] [--show-paths] [--share] [--no-banner]
 aidm pressure [--json] [--share] [--no-banner] [--plain]
+aidm history [--json] [--plain]
+aidm trust [--json]
 aidm cursor clean --safe [--yes]
+aidm fix --safe --yes
+aidm report --latest [--show-paths]
 aidm reports prune --yes
 aidm backups prune --yes
+aidm restore validate --backup <path>
+aidm plan codex-fix|cursor-clean [--json]
+aidm apply --plan <planId> --yes [--json]
+aidm mcp serve
 ```
 
 Use `aidm logo` to print only the banner for screenshots or terminal checks. It does not run diagnostics, create reports, or touch the filesystem. Use `--no-interactive` when you want the old static `doctor` output from a TTY. Use `--no-banner` to keep guided mode but hide the banner. Use `--plain` or `NO_COLOR=1` for simple row output without ANSI color. Use `doctor --json` or `pressure --json` for scripts. Use `doctor --share` or `pressure --share` when you need a public, path-free summary card. `--show-paths` prints local machine paths in human output only; do not paste that output into public issues or chat logs.
+
+`plan` and `apply` implement a local two-step maintenance protocol for harnesses that need an explicit review point. `plan codex-fix` and `plan cursor-clean` create a private local plan file under the tool data directory. `apply --plan <planId> --yes` re-checks identity and then calls the existing safe engine; it does not bypass `fix --safe` or Cursor cleanup safety gates.
+
+Experimental MCP server:
+
+```bash
+ai-dev-maintenance mcp serve
+```
+
+The MCP server is a stdio-only JSON-RPC endpoint for local agent harnesses. No network, socket, or HTTP server is opened. It exposes `aidm_doctor`, `aidm_pressure`, `aidm_report_latest`, `aidm_history`, and `aidm_plan`. It does not expose `aidm_apply`; applying a plan remains an explicit CLI action through `aidm apply --plan <planId> --yes`. `aidm_plan` only creates a private local `0600` plan file and does not run cleanup.
+
+`aidm trust` is a read-only allowlist binary trust check. It shows whether the macOS system commands AIDM relies on are present at the expected root-owned, non-symlink, non-group/other-writable paths. It does not run those commands.
+If any allowlist command is missing or untrusted, `aidm trust` exits `3` so scripts can treat the result as needing review.
+
+## Agent / MCP Usage
+
+Registering AIDM with Claude Code can be done with a stdio command such as:
+
+```bash
+claude mcp add aidm -- aidm mcp serve
+```
+
+The MCP surface is experimental and read-only. It offers diagnosis, pressure, latest report, history, and plan creation. It deliberately does not offer apply or cleanup execution. To execute a plan, a human-visible CLI step is still required:
+
+```bash
+aidm apply --plan <planId> --yes
+```
+
+MCP requests are handled serially. A long local diagnosis can delay later responses in the same session; this is expected for the beta server and avoids introducing background workers or network listeners.
 
 ## Exit Codes
 
@@ -125,7 +168,7 @@ Use `aidm logo` to print only the banner for screenshots or terminal checks. It 
 | `0` | Command completed successfully. This includes read-only checks, `--help`, and `--version`. |
 | `1` | Requested local data was not found, such as `report --latest` before any report exists, or an unexpected runtime error occurred. |
 | `2` | Usage error, unsupported platform, invalid flag, or invalid argument. |
-| `3` | The requested safe action was blocked, unsafe to run, or completed with warnings that need review. |
+| `3` | The requested safe action was blocked, unsafe to run, `trust` found an untrusted allowlist command, or the command completed with warnings that need review. |
 
 ## Safety Guarantees
 
@@ -135,6 +178,8 @@ Use `aidm logo` to print only the banner for screenshots or terminal checks. It 
 - `pressure` does not kill, quit, restart, suspend, renice, or modify processes.
 - `doctor` writes a redacted local report under the tool data directory.
 - `doctor --share` and `pressure --share` use smaller allowlists than saved reports and human dashboards. They do not include paths, process names, PIDs, warnings, blocked reasons, or precise timestamps.
+- `mcp serve` is stdio-only, has no network listener, and does not expose `aidm_apply`.
+- `trust` only lstat-checks the allowlist command paths and does not execute system commands.
 - `doctor` classifies Claude Code `projects` and Cursor `state.vscdb` as private/danger and never auto-touched.
 - `cursor clean --safe` is dry-run by default.
 - `cursor clean --safe --yes` removes only Cursor safe cache/log contents and preserves the safe root directories.
@@ -208,7 +253,7 @@ This only validates a backup. Do not move, copy, or replace database files unles
 
 ## Platform Support
 
-v0.3.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
+v0.4.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
 
 ## Development
 
@@ -219,6 +264,13 @@ corepack pnpm run build
 ```
 
 The package has no runtime dependencies and no install-time package lifecycle scripts.
+
+Release workflow:
+
+- tag pushes matching `v*` run the GitHub release workflow;
+- pre-release versions publish with npm dist-tag `next`;
+- stable versions publish with npm dist-tag `latest`;
+- npm provenance publishing requires configuring npm Trusted Publishers for this repository before using the workflow.
 
 ## Local Data
 

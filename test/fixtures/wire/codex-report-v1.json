@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.4.0-beta.1",
+  "generatedAt": "2026-07-03T00:00:00.000Z",
+  "command": "doctor",
+  "status": "ok",
+  "redacted": true,
+  "target": {
+    "kind": "default-codex-log-db",
+    "pathCategory": "<home>/.codex/logs_2.sqlite"
+  },
+  "findings": {
+    "fixReadiness": {
+      "safe": false,
+      "reasons": [
+        "target database is open by a process"
+      ]
+    }
+  },
+  "metrics": {},
+  "blockedReasons": []
+}

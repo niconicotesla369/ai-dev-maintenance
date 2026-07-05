@@ -1,0 +1,232 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/pressure-report.v2.schema.json",
+  "title": "AIDM Pressure Report v2",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "generatedAt",
+    "command",
+    "status",
+    "redacted",
+    "platform",
+    "totals",
+    "pressureLevel",
+    "memory",
+    "disk",
+    "processes",
+    "warnings",
+    "nextActions"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "toolVersion": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "command": {
+      "const": "pressure"
+    },
+    "status": {
+      "enum": [
+        "ok",
+        "partial",
+        "unsupported",
+        "error"
+      ]
+    },
+    "redacted": {
+      "const": true
+    },
+    "platform": {
+      "type": "string",
+      "minLength": 1
+    },
+    "totals": {
+      "type": "object",
+      "required": [
+        "aiCpuPercent",
+        "aiRssBytes",
+        "aiProcessCount",
+        "otherCpuPercent",
+        "otherRssBytes",
+        "otherProcessCount",
+        "processCount"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "logicalCpuCount": {
+          "type": "number",
+          "minimum": 1
+        },
+        "aiCpuPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "aiCpuCapacityPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "aiRssBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "aiProcessCount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "otherCpuPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "otherCpuCapacityPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "otherRssBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "otherProcessCount": {
+          "type": "number",
+          "minimum": 0
+        },
+        "processCount": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "pressureLevel": {
+      "type": "object",
+      "required": [
+        "overall",
+        "cpu",
+        "memory",
+        "disk",
+        "reasons"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "overall": {
+          "$ref": "#/definitions/pressureLevel"
+        },
+        "cpu": {
+          "$ref": "#/definitions/pressureLevel"
+        },
+        "memory": {
+          "$ref": "#/definitions/pressureLevel"
+        },
+        "disk": {
+          "$ref": "#/definitions/pressureLevel"
+        },
+        "reasons": {
+          "$ref": "#/definitions/stringArray"
+        }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "disk": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "processes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/process"
+      }
+    },
+    "warnings": {
+      "$ref": "#/definitions/stringArray"
+    },
+    "nextActions": {
+      "$ref": "#/definitions/stringArray"
+    }
+  },
+  "definitions": {
+    "pressureLevel": {
+      "enum": [
+        "ok",
+        "medium",
+        "high"
+      ]
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "process": {
+      "type": "object",
+      "required": [
+        "pid",
+        "ppid",
+        "provider",
+        "category",
+        "displayName",
+        "cpuPercent",
+        "memoryPercent",
+        "rssBytes",
+        "commandSummary"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "pid": {
+          "type": "number"
+        },
+        "ppid": {
+          "type": "number"
+        },
+        "provider": {
+          "enum": [
+            "codex",
+            "claude-code",
+            "cursor",
+            "remote-control",
+            "other"
+          ]
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpuPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "memoryPercent": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rssBytes": {
+          "type": "number",
+          "minimum": 0
+        },
+        "commandSummary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

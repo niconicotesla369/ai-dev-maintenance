@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/report-latest.v1.schema.json",
+  "title": "AIDM Latest Report Wrapper v1",
+  "type": "object",
+  "required": [
+    "reportPath",
+    "report"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "reportPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "report": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "toolVersion",
+        "generatedAt",
+        "command",
+        "status",
+        "redacted",
+        "target",
+        "findings",
+        "metrics",
+        "blockedReasons"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "schemaVersion": {
+          "enum": [
+            1,
+            2
+          ]
+        },
+        "toolVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedAt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "partial",
+            "blocked",
+            "unsupported",
+            "error"
+          ]
+        },
+        "redacted": {
+          "const": true
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "kind",
+            "pathCategory"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "pathCategory": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "findings": {
+          "type": "object"
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "blockedReasons": {
+          "$ref": "#/definitions/stringArray"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

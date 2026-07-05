@@ -1,7 +1,7 @@
 import { lstat } from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import { scanPathSize } from '../fs-size.js';
+import { resolveHome } from '../paths.js';
 import type { MaintenanceProvider, ProviderRuntimeOptions, Reclaimability, StateCategory, StateEntry } from './types.js';
 
 const CURSOR_ROOT_CATEGORY = '<home>/Library/Application Support/Cursor';
@@ -110,7 +110,7 @@ async function scanEntry(spec: ReturnType<typeof entrySpec>): Promise<StateEntry
 }
 
 function cursorRoot(env: NodeJS.ProcessEnv = process.env): string {
-  return path.join(env.HOME || os.homedir(), 'Library', 'Application Support', 'Cursor');
+  return path.join(resolveHome(env), 'Library', 'Application Support', 'Cursor');
 }
 
 async function exists(filePath: string): Promise<boolean> {

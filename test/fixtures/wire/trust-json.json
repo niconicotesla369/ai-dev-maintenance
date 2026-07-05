@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.4.0-beta.1",
+  "generatedAt": "2026-07-04T00:00:00.000Z",
+  "command": "trust",
+  "status": "partial",
+  "redacted": true,
+  "entries": [
+    {
+      "name": "sqlite3",
+      "path": "/usr/bin/sqlite3",
+      "status": "trusted",
+      "reasons": []
+    },
+    {
+      "name": "lsof",
+      "path": "/usr/sbin/lsof",
+      "status": "trusted",
+      "reasons": []
+    },
+    {
+      "name": "ps",
+      "path": "/bin/ps",
+      "status": "untrusted",
+      "reasons": [
+        "not_root_owned"
+      ]
+    },
+    {
+      "name": "vm_stat",
+      "path": "/usr/bin/vm_stat",
+      "status": "missing",
+      "reasons": [
+        "missing"
+      ]
+    }
+  ],
+  "summary": {
+    "trusted": 2,
+    "untrusted": 1,
+    "missing": 1,
+    "total": 4
+  },
+  "warnings": []
+}

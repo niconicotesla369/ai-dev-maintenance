@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.4.0-beta.1",
+  "generatedAt": "2026-07-04T00:00:00.000Z",
+  "command": "history",
+  "status": "ok",
+  "redacted": true,
+  "windowDays": 30,
+  "dataPoints": 3,
+  "providers": [
+    {
+      "id": "codex",
+      "displayName": "Codex",
+      "points": [
+        {
+          "date": "2026-07-01",
+          "totalBytes": 10
+        },
+        {
+          "date": "2026-07-02",
+          "totalBytes": 20
+        },
+        {
+          "date": "2026-07-03",
+          "totalBytes": 40
+        }
+      ],
+      "firstBytes": 10,
+      "lastBytes": 40,
+      "deltaBytes": 30,
+      "bytesPerDay": 15,
+      "sparkline": "▁▃█"
+    }
+  ],
+  "totals": {
+    "firstBytes": 100,
+    "lastBytes": 160,
+    "deltaBytes": 60,
+    "bytesPerDay": 30,
+    "sparkline": "▁▄█"
+  },
+  "warnings": [],
+  "nextActions": []
+}

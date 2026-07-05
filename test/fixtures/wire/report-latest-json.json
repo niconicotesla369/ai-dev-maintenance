@@ -1,0 +1,22 @@
+{
+  "reportPath": "<home>/.ai-dev-maintenance/reports/report-latest.json",
+  "report": {
+    "schemaVersion": 1,
+    "toolVersion": "0.4.0-beta.1",
+    "generatedAt": "2026-07-03T00:00:00.000Z",
+    "command": "fix --safe",
+    "status": "ok",
+    "redacted": true,
+    "target": {
+      "kind": "default-codex-log-db",
+      "pathCategory": "<home>/.codex/logs_2.sqlite"
+    },
+    "findings": {},
+    "metrics": {
+      "beforeWalBytes": 1024,
+      "afterWalBytes": 0,
+      "reclaimedBytes": 1024
+    },
+    "blockedReasons": []
+  }
+}

@@ -1,0 +1,5 @@
+AIDM HISTORY
+Window          last 30 days
+Data points     0
+Total state     0 B -> 0 B (0 B, 0 B/day)
+Next            Run doctor again in a few days to build history.

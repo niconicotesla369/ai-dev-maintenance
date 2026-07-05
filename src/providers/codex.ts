@@ -7,7 +7,7 @@ import { writeReport } from '../reports.js';
 import { classifyLsofResult, deriveFixReadiness, parseKnownCodexProcess } from '../safety.js';
 import { checkSqliteJsonSupport } from '../sqlite.js';
 import type { MaintenanceReport } from '../types.js';
-import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from '../version.js';
+import { CODEX_REPORT_SCHEMA_VERSION, TOOL_VERSION } from '../version.js';
 import type { MaintenanceProvider, ProviderDoctorOptions, ProviderRuntimeOptions, StateEntry } from './types.js';
 
 export const codexProvider = {
@@ -134,7 +134,7 @@ export async function knownCodexProcessExists(): Promise<boolean | 'unknown'> {
 
 function baseReport(command: string, generatedAt: string, status: MaintenanceReport['status']): MaintenanceReport {
   return {
-    schemaVersion: REPORT_SCHEMA_VERSION,
+    schemaVersion: CODEX_REPORT_SCHEMA_VERSION,
     toolVersion: TOOL_VERSION,
     generatedAt,
     command,

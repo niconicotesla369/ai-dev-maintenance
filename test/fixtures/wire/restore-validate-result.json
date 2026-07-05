@@ -1,0 +1,10 @@
+{
+  "valid": true,
+  "inspection": {
+    "quickCheck": "ok",
+    "recognizedSchema": true
+  },
+  "warnings": [
+    "Validation only."
+  ]
+}

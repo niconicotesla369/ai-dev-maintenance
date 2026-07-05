@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.4.0-beta.1",
+  "planId": "plan-2026-07-04T00-00-00-000Z-abcdef",
+  "action": "cursor-clean",
+  "status": "ready",
+  "createdAt": "2026-07-04T00:00:00.000Z",
+  "expiresAt": "2026-07-04T00:15:00.000Z",
+  "identityHash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "preview": {
+    "targetCount": 2,
+    "reclaimableBytes": 1024
+  },
+  "blockedReasons": [],
+  "warnings": []
+}

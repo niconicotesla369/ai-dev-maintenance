@@ -1,8 +1,8 @@
 import { codexProvider, checkOpenHandles, knownCodexProcessExists } from './providers/codex.js';
 import { listProviders } from './providers/registry.js';
 import { writeReport } from './reports.js';
-import type { MaintenanceReport, ProviderReport, StateEntry } from './types.js';
-import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from './version.js';
+import type { AggregateDoctorReport, ProviderReport, ReportStatus, StateEntry } from './types.js';
+import { TOOL_VERSION } from './version.js';
 
 export { checkOpenHandles, knownCodexProcessExists };
 
@@ -66,9 +66,9 @@ export async function runCodexDoctor(options: {
   });
 }
 
-function baseAggregateReport(generatedAt: string, status: MaintenanceReport['status']): MaintenanceReport {
+function baseAggregateReport(generatedAt: string, status: ReportStatus): AggregateDoctorReport {
   return {
-    schemaVersion: Math.max(REPORT_SCHEMA_VERSION, 2) as 2,
+    schemaVersion: 2,
     toolVersion: TOOL_VERSION,
     generatedAt,
     command: 'doctor',

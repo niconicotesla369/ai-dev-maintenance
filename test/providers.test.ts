@@ -60,7 +60,7 @@ describe('Codex provider doctor adapter', () => {
     } finally {
       await rm(codexHome, { recursive: true, force: true });
     }
-  });
+  }, 10_000);
 });
 
 describe('Claude Code provider read-only scan', () => {

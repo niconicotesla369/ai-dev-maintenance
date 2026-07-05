@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.4.0-beta.3 - 2026-07-06
+
+- Update aggregate doctor next-action wording for agent use: dry runs stay explicit, cleanup guidance points to `plan` and human-visible `apply`.
+- Clarify MCP `aidm_doctor` description so agents route cleanup through `aidm_plan` and a human CLI step.
+- Document that MCP doctor requests do not write reports and do not appear in local history.
+- Keep cleanup engines, SQLite/WAL handling, redaction, and safe action gates unchanged.
+
 ## 0.4.0-beta.2 - 2026-07-04
 
 - Add JSON schema contracts and wire-compatibility fixtures for machine-readable output.

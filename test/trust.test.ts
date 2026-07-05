@@ -64,7 +64,7 @@ describe('trust command', () => {
       commands: {
         runTrust: async () => ({
           schemaVersion: 1,
-          toolVersion: '0.4.0-beta.2',
+          toolVersion: '0.4.0-beta.3',
           generatedAt: '2026-07-04T00:00:00.000Z',
           command: 'trust',
           status: 'ok',
@@ -103,7 +103,7 @@ describe('trust command', () => {
       commands: {
         runTrust: async () => ({
           schemaVersion: 1,
-          toolVersion: '0.4.0-beta.2',
+          toolVersion: '0.4.0-beta.3',
           generatedAt: '2026-07-04T00:00:00.000Z',
           command: 'trust',
           status: 'partial',
@@ -137,7 +137,7 @@ describe('trust command', () => {
       commands: {
         runTrust: async () => ({
           schemaVersion: 1,
-          toolVersion: '0.4.0-beta.2',
+          toolVersion: '0.4.0-beta.3',
           generatedAt: '2026-07-04T00:00:00.000Z',
           command: 'trust',
           status: 'partial',

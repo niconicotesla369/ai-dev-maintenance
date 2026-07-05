@@ -38,7 +38,7 @@ type McpTool = {
 const MCP_TOOLS: McpTool[] = [
   {
     name: 'aidm_doctor',
-    description: 'Run the aggregate AIDM doctor without writing a local report.',
+    description: 'Run the aggregate AIDM doctor without writing a local report. To clean up, use aidm_plan; applying requires a human-visible CLI step.',
     inputSchema: emptyInputSchema()
   },
   {

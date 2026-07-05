@@ -2,7 +2,7 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.4.0-beta.2 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.4.0-beta.3 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
 `doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -25,7 +25,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.4.0-beta.2
+npx --yes ai-dev-maintenance@0.4.0-beta.3
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -34,13 +34,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -48,7 +48,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.4.0-beta.2
+npm install -g ai-dev-maintenance@0.4.0-beta.3
 aidm
 ```
 
@@ -59,19 +59,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -79,8 +79,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -153,7 +153,7 @@ Registering AIDM with Claude Code can be done with a stdio command such as:
 claude mcp add aidm -- aidm mcp serve
 ```
 
-The MCP surface is experimental and read-only. It offers diagnosis, pressure, latest report, history, and plan creation. It deliberately does not offer apply or cleanup execution. To execute a plan, a human-visible CLI step is still required:
+The MCP surface is experimental and read-only. It offers diagnosis, pressure, latest report, history, and plan creation. It deliberately does not offer apply or cleanup execution. MCP doctor requests do not write reports and do not appear in history; run the CLI `doctor` command when you want a saved local report. In this context, approval means a human runs `aidm apply --plan <planId> --yes` or explicitly approves an equivalent shell command in their harness. To execute a plan, a human-visible CLI step is still required:
 
 ```bash
 aidm apply --plan <planId> --yes

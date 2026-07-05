@@ -149,7 +149,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.3 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -228,7 +228,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.0-beta.2');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.0-beta.3');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -259,7 +259,7 @@ describe('release readiness', () => {
     expect(pkg.files).toContain('CHANGELOG.md');
     expect(changelog).toContain('# Changelog');
     expect(changelog).toContain('## Unreleased');
-    expect(changelog).toContain('## 0.4.0-beta.2 - 2026-07-04');
+    expect(changelog).toContain('## 0.4.0-beta.3 - 2026-07-06');
     expect(changelog).toContain('## 0.3.1 - 2026-07-03');
     expect(changelog).toContain('## 0.3.0 - 2026-07-02');
     for (const version of [
@@ -275,7 +275,7 @@ describe('release readiness', () => {
       '0.2.4',
       '0.2.5',
       '0.2.6',
-      '0.4.0-beta.2',
+      '0.4.0-beta.3',
       '0.3.2',
       '0.3.1',
       '0.3.0'
@@ -309,10 +309,10 @@ describe('release readiness', () => {
     expect(changelog).toContain('pressure JSON schema');
   });
 
-  test('changelog documents the v0.4.0-beta.2 delegation release', async () => {
+  test('changelog documents the v0.4.0-beta.3 delegation release', async () => {
     const changelog = await readFile('CHANGELOG.md', 'utf8');
 
-    expect(changelog).toContain('0.4.0-beta.2');
+    expect(changelog).toContain('0.4.0-beta.3');
     expect(changelog).toContain('MCP');
     expect(changelog).toContain('plan');
     expect(changelog).toContain('apply');
@@ -346,7 +346,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM SHARE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.2');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.3');
     expect(example).toContain('Private danger buckets are never auto-touched.');
     expect(example).not.toContain('/Users');
     expect(example).not.toContain('<home>');
@@ -358,7 +358,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/pressure-share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM PRESSURE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.2 pressure');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.3 pressure');
     expect(example).toContain('AI CPU');
     expect(example).toContain('Other CPU');
     expect(example).toContain('Signals');
@@ -477,6 +477,10 @@ describe('release readiness', () => {
     expect(readmes).toContain('claude mcp add aidm -- aidm mcp serve');
     expect(readmes).toContain('MCP requests are handled serially');
     expect(readmes).toContain('MCP requestは直列処理');
+    expect(readmes).toContain('MCP doctor requests do not write reports and do not appear in history');
+    expect(readmes).toContain('MCP doctor requestはreportを書き込まず、historyにも残りません');
+    expect(readmes).toContain('approval means a human runs `aidm apply --plan <planId> --yes`');
+    expect(readmes).toContain('承認とは、人間が `aidm apply --plan <planId> --yes` を実行すること');
   });
 
   test('readmes document release workflow provenance posture', async () => {

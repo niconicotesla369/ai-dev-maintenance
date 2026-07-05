@@ -36,6 +36,24 @@ describe('aggregate read-only doctor', () => {
     }
   });
 
+  test('next safe action directs agents through plan and human apply', async () => {
+    const home = await makeFixtureHome();
+    try {
+      const { report } = await runDoctor({
+        platform: 'darwin',
+        env: { ...process.env, HOME: home, CODEX_HOME: path.join(home, '.codex') },
+        persistReport: false
+      });
+
+      expect(report.nextSafeAction).toContain('aidm plan cursor-clean');
+      expect(report.nextSafeAction).toContain('aidm apply --plan <planId> --yes');
+      expect(report.nextSafeAction).toContain('human');
+      expect(report.nextSafeAction).not.toContain('Use cursor clean --safe to dry-run');
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   test('renders the three-bucket aggregate doctor summary', () => {
     const output = renderReport(makeAggregateReport());
 

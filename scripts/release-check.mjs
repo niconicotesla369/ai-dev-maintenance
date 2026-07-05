@@ -44,6 +44,7 @@ async function assertReleaseWorkflow() {
     'id-token: write',
     'tags:',
     'v*',
+    'node-version: 24',
     'corepack pnpm run verify',
     'corepack pnpm run build',
     'corepack pnpm run release:check',
@@ -54,6 +55,7 @@ async function assertReleaseWorkflow() {
   ]) {
     if (!workflow.includes(marker)) failures.push(`release workflow is missing: ${marker}`);
   }
+  if (workflow.includes('registry-url:')) failures.push('release workflow must not configure registry-url for trusted publishing');
 }
 
 async function assertMcpStreamingSmoke() {

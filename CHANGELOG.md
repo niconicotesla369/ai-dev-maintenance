@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.4.0-beta.1 - 2026-07-04
+## 0.4.0-beta.2 - 2026-07-04
 
 - Add JSON schema contracts and wire-compatibility fixtures for machine-readable output.
 - Add JSON output for management commands, including `fix`, Cursor cleanup, pruning, restore validation, and report retrieval.
@@ -11,6 +11,7 @@
 - Add experimental stdio-only MCP server with read-only tools and no `aidm_apply` exposure.
 - Add `trust` to inspect allowlist macOS command path trust without executing those commands.
 - Add GitHub release workflow scaffolding for npm provenance publishing.
+- Harden the release workflow with tag/package version matching and OIDC-friendly npm trusted publishing.
 - Keep cleanup engines, SQLite/WAL handling, redaction, and safe action gates unchanged.
 
 ## 0.3.2 - 2026-07-03

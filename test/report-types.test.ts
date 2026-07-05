@@ -11,7 +11,7 @@ describe('maintenance report internal types', () => {
   test('separates Codex schema v1 and aggregate schema v2 report types', () => {
     const codex: CodexMaintenanceReport = {
       schemaVersion: 1,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       generatedAt: '2026-07-03T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -26,7 +26,7 @@ describe('maintenance report internal types', () => {
     };
     const aggregate: AggregateDoctorReport = {
       schemaVersion: 2,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       generatedAt: '2026-07-03T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',
@@ -55,7 +55,7 @@ describe('maintenance report internal types', () => {
   test('exposes a common report envelope for additive wire-compatible types', () => {
     const envelope: ReportEnvelope<2, 'aggregate-ai-tools'> = {
       schemaVersion: 2,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       generatedAt: '2026-07-03T00:00:00.000Z',
       command: 'doctor',
       status: 'ok',

@@ -42,7 +42,7 @@ describe('human CLI output', () => {
     }));
 
     expect(output).toContain('Fix readiness   ready');
-    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- fix --safe --yes');
+    expect(output).toContain('Next            npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- fix --safe --yes');
     expect(output).toContain('Main DB         46.7 MiB');
     expect(output).toContain('WAL             5.2 MiB');
     expect(output).toContain('SHM             1.0 MiB');
@@ -137,8 +137,8 @@ describe('public docs for v0.3.0 UX', () => {
       await readFile('README.ja.md', 'utf8')
     ].join('\n');
 
-    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.1');
-    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths');
+    expect(readmes).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.2');
+    expect(readmes).toContain('npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- doctor --show-paths');
     expect(readmes).toContain('Codex / Claude Code / Cursor');
     expect(readmes).toContain('cursor clean --safe --yes');
     expect(readmes).toContain('aidm logo');

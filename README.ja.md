@@ -2,7 +2,7 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断するためのCLIです。
 
-v0.4.0-beta.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
+v0.4.0-beta.2では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
 
 `doctor` は `lstat` / `readdir` によるサイズ計測と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
 
@@ -25,7 +25,7 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.4.0-beta.1
+npx --yes ai-dev-maintenance@0.4.0-beta.2
 ```
 
 通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
@@ -34,13 +34,13 @@ npx --yes ai-dev-maintenance@0.4.0-beta.1
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -48,7 +48,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.4.0-beta.1
+npm install -g ai-dev-maintenance@0.4.0-beta.2
 aidm
 ```
 
@@ -59,19 +59,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -79,8 +79,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- fix --safe --
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。

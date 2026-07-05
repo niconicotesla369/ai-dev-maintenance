@@ -236,7 +236,7 @@ function mockMcpCommands() {
     runDoctor: async () => ({ report: aggregateReport() }),
     runPressureDoctor: async (): Promise<PressureReport> => ({
       schemaVersion: 2,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       generatedAt: '2026-07-04T00:00:00.000Z',
       command: 'pressure',
       status: 'ok',
@@ -270,7 +270,7 @@ function mockMcpCommands() {
     }),
     runHistory: async (): Promise<HistoryReport> => ({
       schemaVersion: 1,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       generatedAt: '2026-07-04T00:00:00.000Z',
       command: 'history',
       status: 'ok',
@@ -290,7 +290,7 @@ function mockMcpCommands() {
     }),
     createPlan: async (): Promise<MaintenancePlanSummary> => ({
       schemaVersion: 1,
-      toolVersion: '0.4.0-beta.1',
+      toolVersion: '0.4.0-beta.2',
       planId: 'plan-2026-07-04T00-00-00-000Z-abcdef',
       action: 'cursor-clean',
       status: 'ready',
@@ -319,7 +319,7 @@ function mockMcpCommands() {
 function aggregateReport(): MaintenanceReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0-beta.1',
+    toolVersion: '0.4.0-beta.2',
     generatedAt: '2026-07-04T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',

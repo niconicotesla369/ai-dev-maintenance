@@ -1,7 +1,7 @@
 +----------------------------------------------------------------------+
 | AIDM SHARE CARD                                                      |
 |                                                                      |
-| Version           v0.4.0-beta.1                                             |
+| Version           v0.4.0-beta.2                                             |
 | Date              2026-07-03                                         |
 |                                                                      |
 | Providers                                                            |
@@ -16,5 +16,5 @@
 | Private danger    547.7 MiB                                          |
 |                                                                      |
 | Private danger buckets are never auto-touched.                       |
-| Run npx --yes ai-dev-maintenance@0.4.0-beta.1                               |
+| Run npx --yes ai-dev-maintenance@0.4.0-beta.2                               |
 +----------------------------------------------------------------------+

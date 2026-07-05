@@ -13,4 +13,4 @@ Claude Code     112.2 MiB
 Cursor          582.7 MiB
 
 Report          <absolute-path>
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.1 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0-beta.2 -- report --latest

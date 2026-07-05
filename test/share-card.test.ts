@@ -21,7 +21,7 @@ describe('doctor share card', () => {
 
     expect(output).toContain('AIDM SHARE CARD');
     expect(output).toContain('Version');
-    expect(output).toContain('v0.4.0-beta.1');
+    expect(output).toContain('v0.4.0-beta.2');
     expect(output).toContain('Date');
     expect(output).toContain('2026-07-03');
     expect(output).toContain('Codex');
@@ -32,7 +32,7 @@ describe('doctor share card', () => {
     expect(output).toContain('Review first');
     expect(output).toContain('Private danger');
     expect(output).toContain('Private danger buckets are never auto-touched.');
-    expect(output).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.1');
+    expect(output).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.2');
 
     expect(output).not.toContain('/Users');
     expect(output).not.toContain('<home>');
@@ -109,7 +109,7 @@ describe('pressure share card', () => {
 
     expect(output).toContain('AIDM PRESSURE CARD');
     expect(output).toContain('Version');
-    expect(output).toContain('v0.4.0-beta.1');
+    expect(output).toContain('v0.4.0-beta.2');
     expect(output).toContain('Date');
     expect(output).toContain('2026-07-03');
     expect(output).toContain('Pressure');
@@ -124,7 +124,7 @@ describe('pressure share card', () => {
     expect(output).toContain('Disk pressure is high');
     expect(output).toContain('Next actions');
     expect(output).toContain('Run doctor to inspect disk buckets before deleting anything.');
-    expect(output).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.1 pressure');
+    expect(output).toContain('npx --yes ai-dev-maintenance@0.4.0-beta.2 pressure');
 
     expect(output).not.toContain('/Users');
     expect(output).not.toContain('<home>');
@@ -174,7 +174,7 @@ describe('pressure share card', () => {
 function makeAggregateReport(overrides: Partial<MaintenanceReport> = {}): MaintenanceReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0-beta.1',
+    toolVersion: '0.4.0-beta.2',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -228,7 +228,7 @@ function makeProvider(
 function makePressureReport(overrides: Partial<PressureReport> = {}): PressureReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0-beta.1',
+    toolVersion: '0.4.0-beta.2',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

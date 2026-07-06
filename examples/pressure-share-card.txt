@@ -1,7 +1,7 @@
 +----------------------------------------------------------------------+
 | AIDM PRESSURE CARD                                                   |
 |                                                                      |
-| Version           v0.4.0                                             |
+| Version           v0.4.1                                             |
 | Date              2026-07-03                                         |
 |                                                                      |
 | Status                                                               |
@@ -19,5 +19,5 @@
 | Next actions                                                         |
 | - Run doctor to inspect disk buckets before deleting anything.       |
 |                                                                      |
-| Run npx --yes ai-dev-maintenance@0.4.0 pressure                      |
+| Run npx --yes ai-dev-maintenance@0.4.1 pressure                      |
 +----------------------------------------------------------------------+

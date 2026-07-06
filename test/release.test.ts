@@ -149,7 +149,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.0 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -228,7 +228,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.0');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.1');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -259,6 +259,7 @@ describe('release readiness', () => {
     expect(pkg.files).toContain('CHANGELOG.md');
     expect(changelog).toContain('# Changelog');
     expect(changelog).toContain('## Unreleased');
+    expect(changelog).toContain('## 0.4.1 - 2026-07-06');
     expect(changelog).toContain('## 0.4.0 - 2026-07-06');
     expect(changelog).toContain('## 0.3.1 - 2026-07-03');
     expect(changelog).toContain('## 0.3.0 - 2026-07-02');
@@ -275,6 +276,7 @@ describe('release readiness', () => {
       '0.2.4',
       '0.2.5',
       '0.2.6',
+      '0.4.1',
       '0.4.0',
       '0.3.2',
       '0.3.1',
@@ -320,6 +322,16 @@ describe('release readiness', () => {
     expect(changelog).toContain('npm provenance');
   });
 
+  test('changelog documents the v0.4.1 pressure privacy polish', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+
+    expect(changelog).toContain('0.4.1');
+    expect(changelog).toContain('commandSummary');
+    expect(changelog).toContain('executable basenames');
+    expect(changelog).toContain('whole-disk usage');
+    expect(changelog).toContain('safe action gates unchanged');
+  });
+
   test('pressure examples stay on schema v2 with separated AI and non-AI totals', async () => {
     const example = JSON.parse(await readFile('examples/pressure.json', 'utf8'));
     const text = await readFile('examples/pressure.txt', 'utf8');
@@ -346,7 +358,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM SHARE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.1');
     expect(example).toContain('Private danger buckets are never auto-touched.');
     expect(example).not.toContain('/Users');
     expect(example).not.toContain('<home>');
@@ -358,7 +370,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/pressure-share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM PRESSURE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.0 pressure');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.1 pressure');
     expect(example).toContain('AI CPU');
     expect(example).toContain('Other CPU');
     expect(example).toContain('Signals');
@@ -440,6 +452,8 @@ describe('release readiness', () => {
     expect(readmes).toContain('overall pressure level');
     expect(readmes).toContain('Codex Renderer');
     expect(readmes).toContain('node/vitest');
+    expect(readmes).toContain('command summaries are limited to executable basenames');
+    expect(readmes).toContain('command summaryは実行ファイル名だけに制限');
     expect(readmes).toContain('terminal-native pretty output');
     expect(readmes).toContain('NO_COLOR=1');
     expect(readmes).toContain('pressure [--json] [--share] [--no-banner] [--plain]');

@@ -59,6 +59,30 @@ describe('pressure process classification', () => {
     expect(process.commandSummary).not.toContain('--project');
   });
 
+  test('keeps AI provider command summaries to the executable basename only', () => {
+    const privateWorkspace = ['project', 'sample'].join('-');
+    const privatePath = ['', 'Users', 'user-example', privateWorkspace].join('/');
+    const rows = [
+      raw(`/Applications/Cursor.app/Contents/MacOS/Cursor --type=renderer --workspace ${privatePath} --window-config 123e4567-e89b-12d3-a456-426614174000`, 31),
+      raw(`Cursor Helper: extension-host (user) ${privateWorkspace} mcp-example [1-1]`, 32),
+      raw(`claude --cwd ${privatePath} --token secret-token`, 33),
+      raw(`/Applications/Codex.app/Contents/Resources/codex --project ${privatePath}`, 34)
+    ];
+
+    const summaries = classifyPressureProcesses(rows).map((process) => process.commandSummary);
+
+    expect(summaries).toEqual(['Cursor', 'Cursor', 'claude', 'codex']);
+    for (const summary of summaries) {
+      expect(summary).not.toContain(privateWorkspace);
+      expect(summary).not.toContain('mcp-example');
+      expect(summary).not.toContain('123e4567');
+      expect(summary).not.toContain('/Users/');
+      expect(summary).not.toContain('--cwd');
+      expect(summary).not.toContain('--project');
+      expect(summary).not.toContain('secret-token');
+    }
+  });
+
   test('characterizes known process labels without changing provider scope', () => {
     const rows = [
       raw('/Applications/Codex.app/Contents/MacOS/Codex', 40),

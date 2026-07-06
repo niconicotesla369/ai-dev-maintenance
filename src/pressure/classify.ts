@@ -14,7 +14,7 @@ export function classifyPressureProcesses(rows: RawProcessRow[]): PressureProces
       cpuPercent: row.cpuPercent,
       memoryPercent: row.memoryPercent,
       rssBytes: row.rssBytes,
-      commandSummary: provider === 'other' ? executableBasename(row.command) : redactCommandSummary(row.command)
+      commandSummary: executableBasename(row.command)
     };
   });
 }

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.4.0",
+  "toolVersion": "0.4.1",
   "generatedAt": "2026-06-25T00:00:00.000Z",
   "command": "doctor",
   "status": "ok",
@@ -12,7 +12,7 @@
   "findings": {},
   "metrics": {},
   "blockedReasons": [],
-  "nextSafeAction": "Review provider buckets. Dry run: aidm cursor clean --safe. To clean, create a plan with \"aidm plan cursor-clean --json\" and have a human run \"aidm apply --plan <planId> --yes\".",
+  "nextSafeAction": "Review provider buckets. Compare AI tool state with whole-disk usage before treating AI tools as the cause of disk pressure. Dry run: aidm cursor clean --safe. To clean, create a plan with \"aidm plan cursor-clean --json\" and have a human run \"aidm apply --plan <planId> --yes\".",
   "providers": [
     {
       "id": "codex",

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.4.1 - 2026-07-06
+
+- Minimize live pressure `commandSummary` for AI provider processes to executable basenames, preventing workspace names, UUIDs, and launch arguments from crossing JSON or MCP output.
+- Add aggregate doctor context reminding agents to compare AI tool state with whole-disk usage before treating AI tools as the cause of disk pressure.
+- Keep cleanup engines, SQLite/WAL handling, redaction, MCP tool exposure, and safe action gates unchanged.
+
 ## 0.4.0 - 2026-07-06
 
 - Add JSON schema contracts and wire-compatibility fixtures for machine-readable output.

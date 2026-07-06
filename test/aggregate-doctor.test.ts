@@ -48,6 +48,7 @@ describe('aggregate read-only doctor', () => {
       expect(report.nextSafeAction).toContain('aidm plan cursor-clean');
       expect(report.nextSafeAction).toContain('aidm apply --plan <planId> --yes');
       expect(report.nextSafeAction).toContain('human');
+      expect(report.nextSafeAction).toContain('Compare AI tool state with whole-disk usage');
       expect(report.nextSafeAction).not.toContain('Use cursor clean --safe to dry-run');
     } finally {
       await rm(home, { recursive: true, force: true });

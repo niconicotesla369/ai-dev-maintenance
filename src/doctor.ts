@@ -46,7 +46,7 @@ export async function runDoctor(options: {
     confirmBytes: providers.reduce((sum, provider) => sum + provider.buckets.confirmBytes, 0),
     privateBytes: providers.reduce((sum, provider) => sum + provider.buckets.privateBytes, 0)
   };
-  report.nextSafeAction = 'Review provider buckets. Dry run: aidm cursor clean --safe. To clean, create a plan with "aidm plan cursor-clean --json" and have a human run "aidm apply --plan <planId> --yes".';
+  report.nextSafeAction = 'Review provider buckets. Compare AI tool state with whole-disk usage before treating AI tools as the cause of disk pressure. Dry run: aidm cursor clean --safe. To clean, create a plan with "aidm plan cursor-clean --json" and have a human run "aidm apply --plan <planId> --yes".';
 
   const reportPath = options.persistReport === false ? undefined : await writeReport(report);
   return { report, reportPath };

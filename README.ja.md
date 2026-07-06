@@ -2,7 +2,7 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断するためのCLIです。
 
-v0.4.0では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
+v0.4.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
 
 `doctor` は `lstat` / `readdir` によるサイズ計測と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
 
@@ -10,7 +10,7 @@ Cursor cleanup は明示実行だけです。`cursor clean --safe` はdry-run、
 
 既存のCodex専用 `fix --safe --yes` は残っています。これはCodexログデータを含む可能性がある非公開のローカルバックアップを作成してから、CodexログDBのSQLite WAL領域だけを整理します。
 
-`pressure` はディスクcleanupとは別です。ローカルprocess metadataだけを読み、AI開発関連processのCPU/RAM負荷を表示します。`Codex Renderer`、`node/vitest`、`Chrome Helper`、`syspolicyd` のような読みやすい名前を出し、分かりにくい `other` 行を減らします。processのkill、終了、再起動、suspend、renice、変更は行いません。
+`pressure` はディスクcleanupとは別です。ローカルprocess metadataだけを読み、AI開発関連processのCPU/RAM負荷を表示します。`Codex Renderer`、`node/vitest`、`Chrome Helper`、`syspolicyd` のような読みやすい名前を出し、分かりにくい `other` 行を減らします。JSONとMCPに渡すcommand summaryは実行ファイル名だけに制限し、起動引数、workspace名、UUID風のwindow識別子は転送しません。processのkill、終了、再起動、suspend、renice、変更は行いません。
 
 memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします。`vm_stat` のpage情報は補助情報であり、`memory_pressure -Q` が使えない時に高memory pressureを推測するためには使いません。CPU%はmacOS `ps` と同じ per-core 合算です。`100% = 1つの論理CPUコア` なので、multi-core Macでは合計が100%を超えることがあります。論理CPU数を取得できる場合、pressure severityはcapacity正規化済みCPU%で判定し、raw `ps` 合計値も維持します。
 
@@ -25,7 +25,7 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.4.0
+npx --yes ai-dev-maintenance@0.4.1
 ```
 
 通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
@@ -34,13 +34,13 @@ npx --yes ai-dev-maintenance@0.4.0
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -48,7 +48,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.4.0
+npm install -g ai-dev-maintenance@0.4.1
 aidm
 ```
 
@@ -59,19 +59,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -79,8 +79,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- fix --safe --yes
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。

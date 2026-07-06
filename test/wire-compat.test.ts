@@ -82,7 +82,7 @@ async function expectWireOutput(fixtureName: string, actual: string): Promise<vo
 function makeAggregateDoctorReport(): MaintenanceReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0',
+    toolVersion: '0.4.1',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'doctor',
     status: 'ok',
@@ -143,7 +143,7 @@ function makeAggregateDoctorReport(): MaintenanceReport {
 function makeFixSuccessReport(): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.4.0',
+    toolVersion: '0.4.1',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'fix --safe',
     status: 'ok',
@@ -165,7 +165,7 @@ function makeFixSuccessReport(): MaintenanceReport {
 function makeFixBlockedReport(): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.4.0',
+    toolVersion: '0.4.1',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'fix --safe',
     status: 'blocked',
@@ -184,7 +184,7 @@ function makeFixBlockedReport(): MaintenanceReport {
 function makePressureReport(): PressureReport {
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.0',
+    toolVersion: '0.4.1',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'pressure',
     status: 'ok',

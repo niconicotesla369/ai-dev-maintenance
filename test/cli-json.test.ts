@@ -163,7 +163,7 @@ function privateHomePath(...segments: string[]): string {
 function makeFixReport(): MaintenanceReport {
   return {
     schemaVersion: 1,
-    toolVersion: '0.4.1',
+    toolVersion: '0.5.0',
     generatedAt: '2026-07-03T00:00:00.000Z',
     command: 'fix --safe',
     status: 'ok',

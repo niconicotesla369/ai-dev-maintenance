@@ -83,7 +83,7 @@ describe('history report', () => {
   test('renders a compact human history summary', async () => {
     const report: HistoryReport = {
       schemaVersion: 1,
-      toolVersion: '0.4.1',
+      toolVersion: '0.5.0',
       generatedAt: '2026-07-04T00:00:00.000Z',
       command: 'history',
       status: 'ok',
@@ -170,7 +170,7 @@ function aggregateReport(generatedAt: string, totalBytes: number, codexBytes: nu
   const cursor = provider('cursor', 'Cursor', totalBytes - codexBytes);
   return {
     schemaVersion: 2,
-    toolVersion: '0.4.1',
+    toolVersion: '0.5.0',
     generatedAt,
     command: 'doctor',
     status: 'ok',

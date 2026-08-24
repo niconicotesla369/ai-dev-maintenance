@@ -33,5 +33,5 @@ Cache           4.0 MiB safe
 workspaceStorage 8.0 MiB review
 
 Report          <home>/.ai-dev-maintenance/reports/report-2026-06-30T00-00-00-000Z.json
-Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest
+Review          npm exec --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest
 Next            Review tracked provider buckets and coverage warnings. Dry run: aidm cursor clean --safe. To clean, create a plan with "aidm plan cursor-clean --json" and have a human run "aidm apply --plan <planId> --yes".

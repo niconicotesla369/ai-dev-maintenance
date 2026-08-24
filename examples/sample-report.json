@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.4.1",
+  "toolVersion": "0.5.0",
   "generatedAt": "2026-06-25T00:00:00.000Z",
   "command": "doctor",
   "status": "ok",
@@ -79,7 +79,7 @@
           "pathCategory": "<home>/.codex/logs_2.sqlite",
           "bytes": 7340032,
           "reclaimability": "confirm",
-          "note": "Codex log database diagnostic only; v0.4.1 does not stop writes."
+          "note": "Codex log database diagnostic only; v0.5.0 does not stop writes."
         },
         {
           "category": "sidecar",

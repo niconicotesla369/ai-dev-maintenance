@@ -1,8 +1,8 @@
 # ai-dev-maintenance
 
-Safely diagnose local disk usage created by AI coding tool state.
+Safely diagnose complete, disjoint Codex tracked state and current volume context without confusing tracked bytes with reclaimable disk space.
 
-v0.4.1 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, tracked local AI-tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.5.0 diagnoses every regular file under `CODEX_HOME` through known disjoint buckets plus private `other-state`, adds metadata-only volume context and lower-bound warnings, and keeps the distinction between tracked state and reclaimable bytes explicit. It also diagnoses Claude Code and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check with a defensible overall pressure level, and adds path-free `doctor --share` and `pressure --share` cards for public posting. Machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust` remain available.
 
 `doctor` only reads file-size and volume metadata with `lstat`/`readdir`/`statfs` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
 
@@ -37,7 +37,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.4.1
+npx --yes ai-dev-maintenance@0.5.0
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -46,13 +46,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -60,7 +60,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.4.1
+npm install -g ai-dev-maintenance@0.5.0
 aidm
 ```
 
@@ -71,19 +71,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -91,8 +91,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.4.1 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.

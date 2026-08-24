@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 - 2026-08-24
+
 - Diagnose Codex sessions, archives, generated images, backups, sidecars, and unknown root state without double counting.
 - Show the exact OpenAI Codex Sparkle cache as review-first; it remains untouched.
 - Add metadata-only volume context and lower-bound warnings to close the pressure-to-doctor diagnostic gap.

@@ -149,7 +149,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest');
+    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest');
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -228,7 +228,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.4.1');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.5.0');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -358,7 +358,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM SHARE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.1');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.5.0');
     expect(example).toContain('Private danger buckets are never auto-touched.');
     expect(example).not.toContain('/Users');
     expect(example).not.toContain('<home>');
@@ -370,7 +370,7 @@ describe('release readiness', () => {
     const example = await readFile('examples/pressure-share-card.txt', 'utf8');
 
     expect(example).toContain('AIDM PRESSURE CARD');
-    expect(example).toContain('npx --yes ai-dev-maintenance@0.4.1 pressure');
+    expect(example).toContain('npx --yes ai-dev-maintenance@0.5.0 pressure');
     expect(example).toContain('AI CPU');
     expect(example).toContain('Other CPU');
     expect(example).toContain('Signals');
@@ -427,13 +427,15 @@ describe('release readiness', () => {
     }
   });
 
-  test('readmes and unreleased notes document tracked-state scope and compatibility', async () => {
+  test('readmes and v0.5.0 notes document tracked-state scope and compatibility', async () => {
     const [readme, japaneseReadme, changelog] = await Promise.all([
       readFile('README.md', 'utf8'),
       readFile('README.ja.md', 'utf8'),
       readFile('CHANGELOG.md', 'utf8')
     ]);
-    const unreleased = changelog.split('## 0.4.1', 1)[0];
+    const releaseNotes = changelog
+      .split('## 0.5.0 - 2026-08-24', 2)[1]
+      ?.split('## 0.4.1 - 2026-07-06', 1)[0];
     const sparklePath = '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle';
 
     expect(readme).toContain('Tracked state');
@@ -467,15 +469,15 @@ describe('release readiness', () => {
     expect(japaneseReadme).toContain('schema v2');
     expect(japaneseReadme).toContain('`totals.totalBytes`');
 
-    expect(unreleased).toContain('Codex sessions, archives, generated images, backups, sidecars, and unknown root state');
-    expect(unreleased).toContain('without double counting');
-    expect(unreleased).toContain('OpenAI Codex Sparkle cache');
-    expect(unreleased).toContain('review-first');
-    expect(unreleased).toContain('remains untouched');
-    expect(unreleased).toContain('lower-bound warnings');
-    expect(unreleased).toContain('schema v2');
-    expect(unreleased).toContain('cleanup engines/action gates are unchanged');
-    expect(unreleased).toContain('Change human-facing wording from `Total state` to `Tracked state`.');
+    expect(releaseNotes).toContain('Codex sessions, archives, generated images, backups, sidecars, and unknown root state');
+    expect(releaseNotes).toContain('without double counting');
+    expect(releaseNotes).toContain('OpenAI Codex Sparkle cache');
+    expect(releaseNotes).toContain('review-first');
+    expect(releaseNotes).toContain('remains untouched');
+    expect(releaseNotes).toContain('lower-bound warnings');
+    expect(releaseNotes).toContain('schema v2');
+    expect(releaseNotes).toContain('cleanup engines/action gates are unchanged');
+    expect(releaseNotes).toContain('Change human-facing wording from `Total state` to `Tracked state`.');
   });
 
   test('aggregate sample report preserves complete coverage and bucket arithmetic', async () => {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "toolVersion": "0.4.1",
+  "toolVersion": "0.5.0",
   "planId": "plan-2026-07-04T00-00-00-000Z-abcdef",
   "action": "cursor-clean",
   "status": "ready",

@@ -121,6 +121,40 @@ describe('filesystem size scanner', () => {
     expect(result.warnings.map((warning) => warning.code)).toContain('max_children');
   });
 
+  test('excludes exact root entries without excluding nested names', async () => {
+    const root = await makeTempDir();
+    await mkdir(path.join(root, 'sessions'));
+    await writeFile(path.join(root, 'sessions', 'private.jsonl'), 'private');
+    await mkdir(path.join(root, 'kept', 'sessions'), { recursive: true });
+    await writeFile(path.join(root, 'kept', 'sessions', 'visible.txt'), 'visible');
+
+    const result = await scanPathSize(root, 'root-remainder', {
+      excludeRootEntries: ['sessions']
+    });
+
+    expect(result.bytes).toBe(7);
+    expect(result.files).toBe(1);
+    expect(result.sizeTruncated).toBe(false);
+    expect(result.warnings).toEqual([]);
+  });
+
+  test('excluded root entries do not consume the child limit', async () => {
+    const root = await makeTempDir();
+    await mkdir(path.join(root, 'a-excluded'));
+    await writeFile(path.join(root, 'a-excluded', 'hidden.txt'), 'hidden');
+    await writeFile(path.join(root, 'z-visible.txt'), 'visible');
+
+    const result = await scanPathSize(root, 'limited-remainder', {
+      excludeRootEntries: ['a-excluded'],
+      maxChildrenPerDir: 1
+    });
+
+    expect(result.bytes).toBe(7);
+    expect(result.files).toBe(1);
+    expect(result.sizeTruncated).toBe(false);
+    expect(result.warnings).toEqual([]);
+  });
+
   const permissionTest = process.getuid?.() === 0 ? test.skip : test;
 
   permissionTest('reports permission denied directories without throwing', async () => {

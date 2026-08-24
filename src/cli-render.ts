@@ -126,7 +126,18 @@ function renderAggregateReport(
     privateBytes: providers.reduce((sum, provider) => sum + provider.buckets.privateBytes, 0)
   };
   lines.push(row('AI tools', `${detected} detected`));
-  lines.push(row('Total state', formatBytes(totals.totalBytes)));
+  lines.push(row('Tracked state', formatBytes(totals.totalBytes)));
+  const volume = isRecord(report.metrics.volume) ? report.metrics.volume : undefined;
+  const capacityPercent = finiteNumber(volume?.capacityPercent);
+  if (capacityPercent !== undefined) lines.push(row('Volume used', `${capacityPercent.toFixed(1)}%`));
+  const trackedStatePercent = finiteNumber(volume?.trackedStatePercentOfUsedBytes);
+  if (trackedStatePercent !== undefined) {
+    const trackedShare = trackedStatePercent === 0 && isPositiveFinite(totals.totalBytes) && isPositiveFinite(volume?.usedBytes)
+      ? '<0.1%'
+      : `${trackedStatePercent.toFixed(1)}%`;
+    lines.push(row('Tracked share', `${trackedShare} of used volume`));
+  }
+  for (const warning of coverageWarnings(report)) lines.push(row('Warning', redactPath(warning)));
   lines.push(row('Safe reclaimable', formatBytes(totals.safeReclaimableBytes)));
   lines.push(row('Review first', formatBytes(totals.confirmBytes)));
   lines.push(row('Private/danger', `${formatBytes(totals.privateBytes)} (never auto-touched)`));
@@ -146,7 +157,8 @@ function renderAggregateReport(
         : entry.reclaimability === 'safe'
           ? 'safe'
           : 'review';
-      lines.push(row(entryLabel(entry.pathCategory), `${formatBytes(entry.bytes)} ${suffix}`));
+      const lowerBound = entry.sizeTruncated === true ? ' (lower bound)' : '';
+      lines.push(row(entryLabel(entry.pathCategory), `${formatBytes(entry.bytes)} ${suffix}${lowerBound}`));
     }
   }
 
@@ -163,4 +175,20 @@ function entryLabel(pathCategory: string): string {
   const normalized = pathCategory.replaceAll('\\', '/');
   if (normalized.endsWith('state.vscdb.backup')) return 'state.vscdb.bak';
   return normalized.split('/').filter(Boolean).at(-1) ?? pathCategory;
+}
+
+function coverageWarnings(report: MaintenanceReport): string[] {
+  const coverage = report.findings.coverage;
+  if (!isRecord(coverage) || !Array.isArray(coverage.warnings)) return [];
+  return coverage.warnings.filter(isRecord).flatMap((warning) =>
+    typeof warning.message === 'string' ? [warning.message] : []
+  );
+}
+
+function finiteNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function isPositiveFinite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }

@@ -113,7 +113,7 @@ export function renderHistoryReport(report: HistoryReport): string {
     'AIDM HISTORY',
     row('Window', `last ${report.windowDays} days`),
     row('Data points', String(report.dataPoints)),
-    row('Total state', historyLine(report.totals))
+    row('Tracked state', historyLine(report.totals))
   ];
 
   for (const provider of report.providers) {

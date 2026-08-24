@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Diagnose Codex sessions, archives, generated images, backups, sidecars, and unknown root state without double counting.
+- Show the exact OpenAI Codex Sparkle cache as review-first; it remains untouched.
+- Add metadata-only volume context and lower-bound warnings to close the pressure-to-doctor diagnostic gap.
+- Keep aggregate JSON at schema v2 with `totals.totalBytes`; cleanup engines/action gates are unchanged.
+- Change human-facing wording from `Total state` to `Tracked state`.
+
 ## 0.4.1 - 2026-07-06
 
 - Minimize live pressure `commandSummary` for AI provider processes to executable basenames, preventing workspace names, UUIDs, and launch arguments from crossing JSON or MCP output.

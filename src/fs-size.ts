@@ -6,6 +6,7 @@ export type SizeScanOptions = {
   maxEntries?: number;
   maxChildrenPerDir?: number;
   deadlineMs?: number;
+  excludeRootEntries?: readonly string[];
 };
 
 export type SizeScanWarningCode =
@@ -58,6 +59,7 @@ export async function scanPathSize(
     deadlineMs: options.deadlineMs ?? DEFAULT_DEADLINE_MS
   };
   const startedAt = Date.now();
+  const excludedRootEntries = new Set(options.excludeRootEntries ?? []);
   const result: SizeScanResult = {
     pathCategory,
     exists: true,
@@ -69,15 +71,17 @@ export async function scanPathSize(
     warnings: []
   };
   const queue: QueueEntry[] = [{ filePath: rootPath, depth: 0 }];
+  let queueCursor = 0;
   let entriesScanned = 0;
 
-  while (queue.length > 0) {
+  while (queueCursor < queue.length) {
     if (deadlineReached(startedAt, limits.deadlineMs)) {
       truncateWithWarning(result, 'deadline', 'scan deadline reached');
       break;
     }
 
-    const current = queue.shift();
+    const current = queue[queueCursor];
+    queueCursor += 1;
     if (!current) break;
 
     if (entriesScanned >= limits.maxEntries) {
@@ -128,8 +132,12 @@ export async function scanPathSize(
     if (!children) continue;
 
     const sortedChildren = [...children].sort();
-    const selectedChildren = sortedChildren.slice(0, limits.maxChildrenPerDir);
-    if (sortedChildren.length > limits.maxChildrenPerDir) {
+    const eligibleChildren =
+      current.depth === 0
+        ? sortedChildren.filter((child) => !excludedRootEntries.has(child))
+        : sortedChildren;
+    const selectedChildren = eligibleChildren.slice(0, limits.maxChildrenPerDir);
+    if (eligibleChildren.length > limits.maxChildrenPerDir) {
       truncateWithWarning(result, 'max_children', 'maximum children per directory reached');
     }
 

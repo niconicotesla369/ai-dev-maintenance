@@ -10,7 +10,7 @@
 | Cursor        detected    782.5 MiB                                  |
 |                                                                      |
 | Buckets                                                              |
-| Total state       941.3 MiB                                          |
+| Tracked state     941.3 MiB                                          |
 | Safe reclaimable  339.0 MiB                                          |
 | Review first      54.7 MiB                                           |
 | Private danger    547.7 MiB                                          |

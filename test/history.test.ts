@@ -119,7 +119,8 @@ describe('history report', () => {
 
     expect(output).toContain('AIDM HISTORY');
     expect(output).toContain('Data points     3');
-    expect(output).toContain('Total state');
+    expect(output).toContain('Tracked state');
+    expect(output).not.toContain('Total state');
     expect(output).toContain('Codex');
     expect(output).toContain('▁▃█');
   });

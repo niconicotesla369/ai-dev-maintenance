@@ -39,7 +39,7 @@ export function renderShareCard(report: MaintenanceReport): string {
     }),
     '',
     'Buckets',
-    pairLine('Total state', formatBytes(totals.totalBytes)),
+    pairLine('Tracked state', formatBytes(totals.totalBytes)),
     pairLine('Safe reclaimable', formatBytes(totals.safeReclaimableBytes)),
     pairLine('Review first', formatBytes(totals.confirmBytes)),
     pairLine('Private danger', formatBytes(totals.privateBytes)),

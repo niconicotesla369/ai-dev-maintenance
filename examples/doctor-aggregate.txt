@@ -1,29 +1,37 @@
 Diagnosis       complete
 AI tools        3 detected
-Total state     941.3 MiB
-Safe reclaimable 339.0 MiB
-Review first    54.7 MiB
-Private/danger  547.7 MiB (never auto-touched)
+Tracked state   275.0 MiB
+Volume used     92.4%
+Tracked share   0.1% of used volume
+Warning         Tracked AI-tool state is under 5% of used volume; inspect other System Data sources before attributing disk pressure to these providers.
+Safe reclaimable 5.0 MiB
+Review first    81.0 MiB
+Private/danger  189.0 MiB (never auto-touched)
 Changed         redacted report only
 
-Codex           46.7 MiB
+Codex           205.0 MiB
 Advisory        warn: AIDM can diagnose Codex log size, but it does not stop high-frequency writes.
 Next            Update Codex to a version with the upstream log-volume reduction.
-logs_2.sqlite   46.7 MiB review
+sessions        64.0 MiB never
+archived_sessions 8.0 MiB never
+maintenance-archive 32.0 MiB never
+generated_images 16.0 MiB never
+backups         8.0 MiB never
+logs_2.sqlite   7.0 MiB review
+logs_2.sqlite-wal 2.0 MiB review
+logs_2.sqlite-shm 32.0 KiB review
+other-state     4.0 MiB never
+Sparkle         64.0 MiB review
 
-Claude Code     112.1 MiB
-projects        112.1 MiB never
-debug           0 B safe
-settings.json   479 B never
+Claude Code     20.0 MiB
+projects        19.0 MiB never
+debug           1.0 MiB safe
 
-Cursor          782.5 MiB
-state.vscdb     217.9 MiB never
-state.vscdb.bak 217.6 MiB never
-Cache           152.4 MiB safe
-CachedData      89.9 MiB safe
-logs            96.7 MiB safe
+Cursor          50.0 MiB
+state.vscdb     38.0 MiB never
+Cache           4.0 MiB safe
 workspaceStorage 8.0 MiB review
 
 Report          <home>/.ai-dev-maintenance/reports/report-2026-06-30T00-00-00-000Z.json
 Review          npm exec --ignore-scripts ai-dev-maintenance@0.4.1 -- report --latest
-Next            Review provider buckets. Compare AI tool state with whole-disk usage before treating AI tools as the cause of disk pressure. Dry run: aidm cursor clean --safe. To clean, create a plan with "aidm plan cursor-clean --json" and have a human run "aidm apply --plan <planId> --yes".
+Next            Review tracked provider buckets and coverage warnings. Dry run: aidm cursor clean --safe. To clean, create a plan with "aidm plan cursor-clean --json" and have a human run "aidm apply --plan <planId> --yes".

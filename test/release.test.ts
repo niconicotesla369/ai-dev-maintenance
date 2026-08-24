@@ -386,9 +386,224 @@ describe('release readiness', () => {
 
     expect(example).toContain('AIDM HISTORY');
     expect(example).toContain('Data points');
-    expect(example).toContain('Total state');
+    expect(example).toContain('Tracked state');
     expect(example).toContain('Run doctor again in a few days');
     expect(example).not.toContain('/Users');
+  });
+
+  test('public state examples document tracked state and safe Codex review boundaries', async () => {
+    const [doctorExample, shareExample, historyExample] = await Promise.all([
+      readFile('examples/doctor-aggregate.txt', 'utf8'),
+      readFile('examples/share-card.txt', 'utf8'),
+      readFile('examples/history.txt', 'utf8')
+    ]);
+
+    expect(doctorExample).toContain('Tracked state');
+    expect(doctorExample).toContain('Volume used');
+    expect(doctorExample).toContain('Tracked share');
+    expect(doctorExample).toContain('sessions');
+    expect(doctorExample).toContain('maintenance-archive');
+    expect(doctorExample).toContain('Sparkle');
+    expect(doctorExample).not.toContain('Total state');
+    expect(shareExample).toContain('Tracked state');
+    expect(historyExample).toContain('Tracked state');
+    expect(doctorExample).toContain(
+      'Tracked AI-tool state is under 5% of used volume; inspect other System Data sources before attributing disk pressure to these providers.'
+    );
+
+    for (const expectedRow of [
+      'sessions        64.0 MiB never',
+      'archived_sessions 8.0 MiB never',
+      'maintenance-archive 32.0 MiB never',
+      'generated_images 16.0 MiB never',
+      'backups         8.0 MiB never',
+      'other-state     4.0 MiB never',
+      'logs_2.sqlite   7.0 MiB review',
+      'logs_2.sqlite-wal 2.0 MiB review',
+      'logs_2.sqlite-shm 32.0 KiB review',
+      'Sparkle         64.0 MiB review'
+    ]) {
+      expect(doctorExample).toContain(expectedRow);
+    }
+  });
+
+  test('readmes and unreleased notes document tracked-state scope and compatibility', async () => {
+    const [readme, japaneseReadme, changelog] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8'),
+      readFile('CHANGELOG.md', 'utf8')
+    ]);
+    const unreleased = changelog.split('## 0.4.1', 1)[0];
+    const sparklePath = '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle';
+
+    expect(readme).toContain('Tracked state');
+    expect(readme).toContain('tracked state');
+    expect(readme).toContain('lower bound');
+    expect(readme).toContain(sparklePath);
+    expect(readme).toContain('review-first');
+    expect(readme).toContain('statfs');
+    expect(readme).toContain('known disjoint buckets');
+    expect(readme).toContain('private `other-state`');
+    expect(readme).toContain('all regular files under `CODEX_HOME`');
+    expect(readme).toContain('not all macOS System Data');
+    expect(readme).toContain('never auto-deleted');
+    expect(readme).toContain('Generic updater globs are not scanned or cleaned');
+    expect(readme).toContain('diagnostic, not causal');
+    expect(readme).toContain('schema v2');
+    expect(readme).toContain('`totals.totalBytes`');
+
+    expect(japaneseReadme).toContain('追跡対象の状態');
+    expect(japaneseReadme).toContain('下限値');
+    expect(japaneseReadme).toContain(sparklePath);
+    expect(japaneseReadme).toContain('確認が必要');
+    expect(japaneseReadme).toContain('statfs');
+    expect(japaneseReadme).toContain('既知の重複しないバケット');
+    expect(japaneseReadme).toContain('privateな `other-state`');
+    expect(japaneseReadme).toContain('`CODEX_HOME` 配下のすべての通常ファイル');
+    expect(japaneseReadme).toContain('macOSの「System Data」全体ではありません');
+    expect(japaneseReadme).toContain('自動削除しません');
+    expect(japaneseReadme).toContain('汎用のupdater globはscanもcleanupもしません');
+    expect(japaneseReadme).toContain('診断用であり、因果関係を示すものではありません');
+    expect(japaneseReadme).toContain('schema v2');
+    expect(japaneseReadme).toContain('`totals.totalBytes`');
+
+    expect(unreleased).toContain('Codex sessions, archives, generated images, backups, sidecars, and unknown root state');
+    expect(unreleased).toContain('without double counting');
+    expect(unreleased).toContain('OpenAI Codex Sparkle cache');
+    expect(unreleased).toContain('review-first');
+    expect(unreleased).toContain('remains untouched');
+    expect(unreleased).toContain('lower-bound warnings');
+    expect(unreleased).toContain('schema v2');
+    expect(unreleased).toContain('cleanup engines/action gates are unchanged');
+    expect(unreleased).toContain('Change human-facing wording from `Total state` to `Tracked state`.');
+  });
+
+  test('aggregate sample report preserves complete coverage and bucket arithmetic', async () => {
+    type SampleEntry = {
+      pathCategory: string;
+      bytes: number;
+      reclaimability: 'safe' | 'confirm' | 'never';
+    };
+    type SampleBuckets = {
+      safeReclaimableBytes: number;
+      confirmBytes: number;
+      privateBytes: number;
+    };
+    type SampleProvider = {
+      id: string;
+      totalBytes: number;
+      buckets: SampleBuckets;
+      entries: SampleEntry[];
+    };
+    type AggregateSample = {
+      schemaVersion: number;
+      metrics: { volume: Record<string, number> };
+      findings: { coverage: Record<string, unknown> };
+      providers: SampleProvider[];
+      totals: { totalBytes: number } & SampleBuckets;
+    };
+    const sample: AggregateSample = JSON.parse(await readFile('examples/sample-report.json', 'utf8'));
+    const codex = sample.providers.find((provider) => provider.id === 'codex');
+    if (!codex) throw new Error('Codex provider sample is missing');
+    const expectedCodexEntries = [
+      { pathCategory: '<home>/.codex/sessions', bytes: 67108864, reclaimability: 'never' },
+      { pathCategory: '<home>/.codex/archived_sessions', bytes: 8388608, reclaimability: 'never' },
+      { pathCategory: '<home>/.codex/maintenance-archive', bytes: 33554432, reclaimability: 'never' },
+      { pathCategory: '<home>/.codex/generated_images', bytes: 16777216, reclaimability: 'never' },
+      { pathCategory: '<home>/.codex/backups', bytes: 8388608, reclaimability: 'never' },
+      { pathCategory: '<home>/.codex/logs_2.sqlite', bytes: 7340032, reclaimability: 'confirm' },
+      { pathCategory: '<home>/.codex/logs_2.sqlite-wal', bytes: 2097152, reclaimability: 'confirm' },
+      { pathCategory: '<home>/.codex/logs_2.sqlite-shm', bytes: 32768, reclaimability: 'confirm' },
+      { pathCategory: '<home>/.codex/other-state', bytes: 4194304, reclaimability: 'never' },
+      {
+        pathCategory: '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle',
+        bytes: 67108864,
+        reclaimability: 'confirm'
+      }
+    ] as const;
+    const expectedProviders = [
+      {
+        id: 'codex',
+        totalBytes: 214990848,
+        buckets: { safeReclaimableBytes: 0, confirmBytes: 76578816, privateBytes: 138412032 }
+      },
+      {
+        id: 'claude-code',
+        totalBytes: 20971520,
+        buckets: { safeReclaimableBytes: 1048576, confirmBytes: 0, privateBytes: 19922944 }
+      },
+      {
+        id: 'cursor',
+        totalBytes: 52428800,
+        buckets: { safeReclaimableBytes: 4194304, confirmBytes: 8388608, privateBytes: 39845888 }
+      }
+    ] as const;
+    const bucketFields = [
+      { reclaimability: 'safe', totalKey: 'safeReclaimableBytes' },
+      { reclaimability: 'confirm', totalKey: 'confirmBytes' },
+      { reclaimability: 'never', totalKey: 'privateBytes' }
+    ] as const;
+
+    expect(sample.schemaVersion).toBe(2);
+    expect(sample.metrics.volume).toEqual(expect.objectContaining({
+      usedBytes: expect.any(Number),
+      capacityPercent: expect.any(Number),
+      trackedStatePercentOfUsedBytes: expect.any(Number)
+    }));
+    expect(sample.findings.coverage).toEqual(expect.objectContaining({
+      complete: expect.any(Boolean),
+      trackedStateIsLowerBound: expect.any(Boolean),
+      warnings: expect.any(Array)
+    }));
+    expect(codex.entries).toHaveLength(expectedCodexEntries.length);
+    expect(codex.entries).toEqual(expect.arrayContaining(
+      expectedCodexEntries.map((entry) => expect.objectContaining(entry))
+    ));
+    expect(sample.metrics.volume).toEqual({
+      totalBytes: 274877906944,
+      usedBytes: 193273528320,
+      availableBytes: 81604378624,
+      capacityPercent: 70.3,
+      trackedStatePercentOfUsedBytes: 0.1
+    });
+    expect(sample.findings.coverage).toEqual({
+      complete: true,
+      trackedStateIsLowerBound: false,
+      warnings: []
+    });
+    expect(sample.providers).toHaveLength(expectedProviders.length);
+    for (const expectedProvider of expectedProviders) {
+      expect(sample.providers.find((provider) => provider.id === expectedProvider.id))
+        .toEqual(expect.objectContaining(expectedProvider));
+    }
+    expect(sample.totals).toEqual({
+      totalBytes: 288391168,
+      safeReclaimableBytes: 5242880,
+      confirmBytes: 84967424,
+      privateBytes: 198180864
+    });
+
+    for (const provider of sample.providers) {
+      expect(provider.totalBytes).toBe(provider.entries.reduce(
+        (sum, entry) => sum + entry.bytes,
+        0
+      ));
+      for (const { reclaimability, totalKey } of bucketFields) {
+        expect(provider.buckets[totalKey]).toBe(provider.entries
+          .filter((entry) => entry.reclaimability === reclaimability)
+          .reduce((sum, entry) => sum + entry.bytes, 0));
+      }
+    }
+    expect(sample.totals.totalBytes).toBe(sample.providers.reduce(
+      (sum, provider) => sum + provider.totalBytes,
+      0
+    ));
+    for (const { totalKey } of bucketFields) {
+      expect(sample.totals[totalKey]).toBe(sample.providers.reduce(
+        (sum, provider) => sum + provider.buckets[totalKey],
+        0
+      ));
+    }
   });
 
   test('readmes document pressure measurement sources and schema v2 semantics', async () => {

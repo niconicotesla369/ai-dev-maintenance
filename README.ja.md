@@ -2,9 +2,21 @@
 
 AI開発ツールのローカル状態で増えたディスク使用量を、安全に診断するためのCLIです。
 
-v0.4.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、合計使用量、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
+v0.4.1では、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、さらに公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを追加しました。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も追加しています。読みやすいprocess名、防御可能なCPU/RAM pressure、追跡対象の状態、比較的安全そうなcache/log、確認が必要な領域、絶対に自動で触らないprivate/danger領域を分けて表示します。
 
-`doctor` は `lstat` / `readdir` によるサイズ計測と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
+`doctor` は `lstat` / `readdir` / `statfs` によるファイルサイズ・volume metadataの取得と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
+
+## 追跡対象の状態と互換性
+
+`Tracked state`（追跡対象の状態）は、AIDMが明示的に診断した項目の合計であり、macOSの「System Data」全体ではありません。Codexでは、既知の重複しないバケットとprivateな `other-state` により、`CODEX_HOME` 配下のすべての通常ファイルを重複計上せずに対象にします。sessions、archives、generated images、backups、log database sidecars、unknown root stateは診断しますが、cleanup対象ではありません。
+
+custom `CODEX_HOME` が正確なSparkle rootと重なる場合は、境界安全なpath所有権によってunionを一度だけ表示します。より広いrootが所有し、同じrootならcustomを優先します。custom ownerはprivateなバケットとremainderを維持し、より広いSparkle ownerはreview-firstではなく保守的に `never` として扱います。
+
+重ならない場合、`<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` にある正確な `org.sparkle-project.Sparkle` のcacheは、確認が必要（review-first）として表示し、自動削除しません。汎用のupdater globはscanもcleanupもしません。AIDMはCodexのsessionやSparkleをcleanupしません。
+
+metadata-onlyなファイルサイズscanに加え、`doctor` は `statfs` でmetadata-onlyなvolume contextを取得します。ファイル本文は読みません。scanがtruncatedの場合は下限値として表示するため、bytesは完全な計測値ではなく最小値です。providerのlogical bytesとvolumeのallocated usageは別の計測値なので、tracked-shareの割合は診断用であり、因果関係を示すものではありません。
+
+aggregate JSONは互換性のためschema v2のままで、`totals.totalBytes` も維持します。この表現変更でcleanup scope、cleanup engine、action gateは変わりません。人間向けaggregate出力では、合計使用量ではなく `Tracked state` を表示します。
 
 Cursor cleanup は明示実行だけです。`cursor clean --safe` はdry-run、`cursor clean --safe --yes` はCursorの `Cache`、`CachedData`、`CachedExtensionVSIXs`、`logs` の中身だけを削除します。`state.vscdb`、`state.vscdb.backup`、`workspaceStorage`、設定、認証情報、会話履歴には触りません。
 

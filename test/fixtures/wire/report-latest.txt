@@ -1,6 +1,6 @@
 Diagnosis       complete
 AI tools        3 detected
-Total state     741.6 MiB
+Tracked state   741.6 MiB
 Safe reclaimable 137.7 MiB
 Review first    56.0 MiB
 Private/danger  547.8 MiB (never auto-touched)

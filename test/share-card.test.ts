@@ -27,7 +27,8 @@ describe('doctor share card', () => {
     expect(output).toContain('Codex');
     expect(output).toContain('Claude Code');
     expect(output).toContain('Cursor');
-    expect(output).toContain('Total state');
+    expect(output).toContain('Tracked state');
+    expect(output).not.toContain('Total state');
     expect(output).toContain('Safe reclaimable');
     expect(output).toContain('Review first');
     expect(output).toContain('Private danger');

@@ -7,6 +7,12 @@ import { codexProvider } from '../src/providers/codex.js';
 import { cursorProvider } from '../src/providers/cursor.js';
 import { getProvider, listProviders } from '../src/providers/registry.js';
 
+async function writeFixture(root: string, relativePath: string, contents: string): Promise<void> {
+  const fixturePath = path.join(root, relativePath);
+  await mkdir(path.dirname(fixturePath), { recursive: true });
+  await writeFile(fixturePath, contents);
+}
+
 describe('maintenance provider registry', () => {
   test('registers the v0.3.0 provider set', () => {
     const providers = listProviders();
@@ -61,6 +67,197 @@ describe('Codex provider doctor adapter', () => {
       await rm(codexHome, { recursive: true, force: true });
     }
   }, 10_000);
+});
+
+describe('Codex provider read-only scan', () => {
+  test('counts disjoint Codex state and the exact Sparkle cache once', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-provider-codex-state-'));
+    try {
+      await writeFixture(home, '.codex/sessions/current.jsonl', 'session');
+      await writeFixture(home, '.codex/archived_sessions/old.jsonl', 'archive');
+      await writeFixture(home, '.codex/maintenance-archive/item', 'old');
+      await writeFixture(home, '.codex/generated_images/image.png', 'image');
+      await writeFixture(home, '.codex/backups/state.bin', 'backup');
+      await writeFixture(home, '.codex/logs_2.sqlite', 'logdb');
+      await writeFixture(home, '.codex/logs_2.sqlite-wal', 'wal');
+      await writeFixture(home, '.codex/logs_2.sqlite-shm', 'shm');
+      await writeFixture(home, '.codex/config.toml', 'cfg');
+      await writeFixture(home, '.codex/skills/tool.txt', 'skill');
+      await writeFixture(
+        home,
+        'Library/Caches/com.openai.codex/org.sparkle-project.Sparkle/PersistentDownloads/update.zip',
+        'update'
+      );
+
+      const entries = await codexProvider.scan({ env: { HOME: home } });
+
+      expect(entries.reduce((sum, entry) => sum + entry.bytes, 0)).toBe(53);
+      expect(entries.filter((entry) => entry.reclaimability === 'never')
+        .reduce((sum, entry) => sum + entry.bytes, 0)).toBe(36);
+      expect(entries.filter((entry) => entry.reclaimability === 'confirm')
+        .reduce((sum, entry) => sum + entry.bytes, 0)).toBe(17);
+      expect(entries.filter((entry) => entry.reclaimability === 'safe')).toEqual([]);
+      expect(entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({ pathCategory: '<home>/.codex/sessions', bytes: 7, reclaimability: 'never' }),
+        expect.objectContaining({ pathCategory: '<home>/.codex/other-state', bytes: 8, reclaimability: 'never' }),
+        expect.objectContaining({ pathCategory: '<home>/.codex/logs_2.sqlite-wal', bytes: 3, category: 'sidecar' }),
+        expect.objectContaining({
+          pathCategory: '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle',
+          bytes: 6,
+          reclaimability: 'confirm',
+          note: 'updater cache; manual review required; AIDM does not delete it'
+        })
+      ]));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('detects the exact Sparkle cache and redacts custom Codex home categories', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-provider-codex-detection-'));
+    const customRoot = path.join(home, 'custom-codex');
+    try {
+      await writeFixture(
+        home,
+        'Library/Caches/com.openai.codex/org.sparkle-project.Sparkle/PersistentDownloads/update.zip',
+        'update'
+      );
+
+      expect(await codexProvider.detect({ env: { HOME: home } })).toEqual({
+        present: true,
+        roots: [
+          '<home>/.codex',
+          '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle'
+        ]
+      });
+
+      await writeFixture(customRoot, 'sessions/current.jsonl', 'session');
+      const entries = await codexProvider.scan({ env: { HOME: home, CODEX_HOME: customRoot } });
+
+      expect(await codexProvider.detect({ env: { HOME: home, CODEX_HOME: customRoot } }))
+        .toEqual({
+          present: true,
+          roots: [
+            'custom-codex-home',
+            '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle'
+          ]
+        });
+      expect(entries).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          pathCategory: 'custom-codex-home/sessions',
+          bytes: 7,
+          reclaimability: 'never'
+        }),
+        expect.objectContaining({
+          pathCategory: '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle',
+          bytes: 6,
+          reclaimability: 'confirm'
+        })
+      ]));
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('lets an equal custom Codex home own the Sparkle union once', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-provider-codex-equal-root-'));
+    const sparkleRoot = path.join(
+      home,
+      'Library',
+      'Caches',
+      'com.openai.codex',
+      'org.sparkle-project.Sparkle'
+    );
+    try {
+      await writeFixture(sparkleRoot, 'sessions/current.jsonl', 'private');
+      await writeFixture(sparkleRoot, 'PersistentDownloads/update.zip', 'cache');
+      await writeFixture(sparkleRoot, 'settings.toml', 'other');
+
+      const [detected, entries] = await Promise.all([
+        codexProvider.detect({ env: { HOME: home, CODEX_HOME: sparkleRoot } }),
+        codexProvider.scan({ env: { HOME: home, CODEX_HOME: sparkleRoot } })
+      ]);
+
+      expect(detected).toEqual({ present: true, roots: ['custom-codex-home'] });
+      expect(entries.map((entry) => entry.pathCategory)).toEqual([
+        'custom-codex-home/sessions',
+        'custom-codex-home/other-state'
+      ]);
+      expect(entries.reduce((sum, entry) => sum + entry.bytes, 0)).toBe(17);
+      expect(entries.every((entry) => entry.reclaimability === 'never')).toBe(true);
+      expect(entries.filter((entry) => entry.reclaimability === 'safe')).toEqual([]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('lets an ancestor custom Codex home own the Sparkle union once', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-provider-codex-ancestor-root-'));
+    const customRoot = path.join(home, 'Library', 'Caches', 'com.openai.codex');
+    try {
+      await writeFixture(customRoot, 'sessions/current.jsonl', 'private');
+      await writeFixture(
+        customRoot,
+        'org.sparkle-project.Sparkle/PersistentDownloads/update.zip',
+        'cache'
+      );
+      await writeFixture(customRoot, 'outside-sparkle.bin', 'other');
+
+      const [detected, entries] = await Promise.all([
+        codexProvider.detect({ env: { HOME: home, CODEX_HOME: customRoot } }),
+        codexProvider.scan({ env: { HOME: home, CODEX_HOME: customRoot } })
+      ]);
+
+      expect(detected).toEqual({ present: true, roots: ['custom-codex-home'] });
+      expect(entries.map((entry) => entry.pathCategory)).toEqual([
+        'custom-codex-home/sessions',
+        'custom-codex-home/other-state'
+      ]);
+      expect(entries.reduce((sum, entry) => sum + entry.bytes, 0)).toBe(17);
+      expect(entries.every((entry) => entry.reclaimability === 'never')).toBe(true);
+      expect(entries.filter((entry) => entry.reclaimability === 'safe')).toEqual([]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('lets an ancestor Sparkle root own the custom Codex union once', async () => {
+    const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-provider-codex-descendant-root-'));
+    const sparkleRoot = path.join(
+      home,
+      'Library',
+      'Caches',
+      'com.openai.codex',
+      'org.sparkle-project.Sparkle'
+    );
+    const customRoot = path.join(sparkleRoot, 'custom-codex');
+    try {
+      await writeFixture(sparkleRoot, 'PersistentDownloads/update.zip', 'cache');
+      await writeFixture(customRoot, 'sessions/current.jsonl', 'private');
+      await writeFixture(customRoot, 'settings.toml', 'other');
+
+      const [detected, entries] = await Promise.all([
+        codexProvider.detect({ env: { HOME: home, CODEX_HOME: customRoot } }),
+        codexProvider.scan({ env: { HOME: home, CODEX_HOME: customRoot } })
+      ]);
+
+      expect(detected).toEqual({
+        present: true,
+        roots: ['<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle']
+      });
+      expect(entries).toEqual([
+        expect.objectContaining({
+          pathCategory: '<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle',
+          bytes: 17,
+          category: 'cache',
+          reclaimability: 'never'
+        })
+      ]);
+      expect(entries.filter((entry) => entry.reclaimability === 'safe')).toEqual([]);
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('Claude Code provider read-only scan', () => {

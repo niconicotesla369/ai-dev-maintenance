@@ -2,9 +2,21 @@
 
 Safely diagnose local disk usage created by AI coding tool state.
 
-v0.4.1 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, total AI tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
+v0.4.1 diagnoses Codex, Claude Code, and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check, and adds path-free `doctor --share` and `pressure --share` cards for public posting. It also adds machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust`. It shows readable process names, a defensible overall pressure level, CPU/RAM pressure, tracked local AI-tool state, safe-looking cache/log buckets, review-first buckets, and private/danger buckets that are never auto-touched.
 
-`doctor` only scans file sizes with `lstat`/`readdir` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
+`doctor` only reads file-size and volume metadata with `lstat`/`readdir`/`statfs` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
+
+## Tracked State Scope and Compatibility
+
+`Tracked state` is the sum of entries AIDM explicitly diagnoses, not all macOS System Data. This tracked state for Codex uses known disjoint buckets plus private `other-state` to cover all regular files under `CODEX_HOME` without double counting: sessions, archives, generated images, backups, log-database sidecars, and unknown root state are diagnosed, not cleanup targets.
+
+When a custom `CODEX_HOME` overlaps the exact Sparkle root, boundary-safe path ownership emits their union once: the wider root owns it, with custom ownership winning an equal-root tie. A custom owner keeps its private buckets and remainder; a wider Sparkle owner is conservatively `never`, not review-first.
+
+When disjoint, the exact `org.sparkle-project.Sparkle` cache at `<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` is visible as review-first and is never auto-deleted. Generic updater globs are not scanned or cleaned. AIDM does not clean Codex sessions or Sparkle.
+
+In addition to the metadata-only file-size scan, `doctor` uses `statfs` for metadata-only volume context; it does not read file contents. A truncated scan reports a lower bound, so its bytes are a minimum rather than a complete measurement. Provider logical bytes and volume allocated usage are different measurements, which makes tracked-share percentages diagnostic, not causal evidence of disk pressure.
+
+Aggregate JSON remains schema v2 for compatibility, including `totals.totalBytes`. This wording change does not alter cleanup scope, cleanup engines, or action gates: human aggregate output calls the value `Tracked state` rather than total local AI-tool state.
 
 The Cursor cleanup path is opt-in. `cursor clean --safe` is a dry run, and `cursor clean --safe --yes` removes only Cursor `Cache`, `CachedData`, `CachedExtensionVSIXs`, and `logs` contents. It does not touch `state.vscdb`, `state.vscdb.backup`, `workspaceStorage`, settings, auth, or conversation history.
 
@@ -234,7 +246,7 @@ Redacted reports keep high-level target categories, existence flags, file sizes,
 Human-readable output includes:
 
 - detected AI tools;
-- total local AI tool state;
+- tracked local AI-tool state;
 - safe-looking cache/log buckets;
 - review-first buckets;
 - private/danger buckets that are never auto-touched;

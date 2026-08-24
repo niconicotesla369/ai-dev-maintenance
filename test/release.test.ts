@@ -630,8 +630,8 @@ describe('release readiness', () => {
     const readme = await readFile('README.md', 'utf8');
     const changelog = await readFile('CHANGELOG.md', 'utf8');
 
-    expect(readme).toContain('v0.4.x currently supports macOS only');
-    expect(readme).not.toContain('v0.2.x currently supports macOS only');
+    expect(readme).toContain('v0.5.x currently supports macOS only');
+    expect(readme).not.toMatch(/v0\.[234]\.x currently supports macOS only/);
     expect(countOccurrences(readme, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
     expect(countOccurrences(changelog, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
   });

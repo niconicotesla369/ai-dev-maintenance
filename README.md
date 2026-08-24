@@ -265,7 +265,7 @@ This only validates a backup. Do not move, copy, or replace database files unles
 
 ## Platform Support
 
-v0.4.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
+v0.5.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
 
 ## Development
 

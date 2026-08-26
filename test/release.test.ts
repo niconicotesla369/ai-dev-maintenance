@@ -1,8 +1,19 @@
 import { readFile } from 'node:fs/promises';
+import { Ajv } from 'ajv';
 import { describe, expect, test } from 'vitest';
 import { fixSafeConfirmationError, isDirectCliInvocation, renderReport, runCli } from '../src/cli.js';
 import type { MaintenanceReport } from '../src/types.js';
 import { TOOL_VERSION } from '../src/version.js';
+
+type RuntimeNetworkSource = { path: string; source: string };
+type ReleaseNetworkCheck = {
+  findRuntimeNetworkPolicyViolations(files: readonly RuntimeNetworkSource[]): string[];
+};
+
+async function loadReleaseNetworkCheck(): Promise<ReleaseNetworkCheck> {
+  const modulePath = new URL('../scripts/release-network-check.mjs', import.meta.url).href;
+  return await import(modulePath) as ReleaseNetworkCheck;
+}
 
 describe('release readiness', () => {
   test('package version and runtime version stay synchronized', async () => {
@@ -25,7 +36,10 @@ describe('release readiness', () => {
   });
 
   test('release check validates the packed artifact and install-time lifecycle posture', async () => {
-    const releaseCheck = await readFile('scripts/release-check.mjs', 'utf8');
+    const [releaseCheck, networkCheck] = await Promise.all([
+      readFile('scripts/release-check.mjs', 'utf8'),
+      readFile('scripts/release-network-check.mjs', 'utf8')
+    ]);
     const workflow = await readFile('.github/workflows/ci.yml', 'utf8');
 
     const pkg = JSON.parse(await readFile('package.json', 'utf8'));
@@ -39,11 +53,144 @@ describe('release readiness', () => {
     expect(releaseCheck).toContain('ai-dev-maintenance');
     expect(releaseCheck).toContain('bin.aidm must point to dist/cli.js');
     expect(releaseCheck).toContain('listSourceFiles');
-    expect(releaseCheck).toContain('node:net');
-    expect(releaseCheck).toContain('node:dns');
+    expect(releaseCheck).toContain('findRuntimeNetworkPolicyViolations');
+    expect(networkCheck).toContain('node:net');
+    expect(networkCheck).toContain('NODE_NETWORK_PRIMITIVE');
     expect(workflow).toContain('corepack pnpm run release:check:prepublic');
     expect(workflow).toContain('--ignore-scripts');
     expect(workflow).toContain('npm install --ignore-scripts');
+  });
+
+  test('release network policy accepts only the exact production loopback lane', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const client = [
+      'let heartbeatPath: string | null = config.token === null ? null : `/${config.token}/heartbeat`;',
+      'let closePath: string | null = config.token === null ? null : `/${config.token}/close`;',
+      'const response = await fetch(heartbeatPath, { method: \'POST\', cache: \'no-store\' });',
+      'navigator.sendBeacon(closePath);'
+    ].join('\n');
+    const server = [
+      "import http from 'node:http';",
+      "import type { AddressInfo } from 'node:net';",
+      'export const VISUAL_REPORT_SERVER_LIMITS = Object.freeze({',
+      "  host: '127.0.0.1',",
+      '  port: 0',
+      '});',
+      'server.listen(VISUAL_REPORT_SERVER_LIMITS.port, VISUAL_REPORT_SERVER_LIMITS.host);'
+    ].join('\n');
+
+    expect(findRuntimeNetworkPolicyViolations([
+      { path: 'src/visual-report/client.ts', source: client },
+      { path: 'src/visual-report/server.ts', source: server },
+      { path: 'src/cli.ts', source: 'export const version = 1;' }
+    ])).toEqual([]);
+  });
+
+  test('release network policy rejects an extra client fetch', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const source = [
+      'let heartbeatPath: string | null = config.token === null ? null : `/${config.token}/heartbeat`;',
+      'await fetch(heartbeatPath, { method: \'POST\' });',
+      'await fetch(heartbeatPath, { method: \'POST\' });'
+    ].join('\n');
+
+    expect(findRuntimeNetworkPolicyViolations([
+      { path: 'src/visual-report/client.ts', source }
+    ])).toContain('visual report client must contain only the approved heartbeat fetch and close beacon');
+  });
+
+  test('release network policy rejects an external client URL', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const source = [
+      'let heartbeatPath: string | null = config.token === null ? null : `/${config.token}/heartbeat`;',
+      "await fetch('https://example.test/heartbeat', { method: 'POST' });"
+    ].join('\n');
+
+    expect(findRuntimeNetworkPolicyViolations([
+      { path: 'src/visual-report/client.ts', source }
+    ])).toContain('visual report client must contain only the approved heartbeat fetch and close beacon');
+  });
+
+  test('release network policy rejects additional browser network capabilities', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const approved = [
+      'let heartbeatPath: string | null = config.token === null ? null : `/${config.token}/heartbeat`;',
+      'let closePath: string | null = config.token === null ? null : `/${config.token}/close`;',
+      'await fetch(heartbeatPath, { method: \'POST\' });',
+      'navigator.sendBeacon(closePath);'
+    ];
+
+    for (const extra of [
+      "navigator.sendBeacon('https://example.test/collect');",
+      "new WebSocket('wss://example.test/socket');",
+      "new EventSource('https://example.test/events');",
+      'new XMLHttpRequest();'
+    ]) {
+      expect(findRuntimeNetworkPolicyViolations([
+        { path: 'src/visual-report/client.ts', source: [...approved, extra].join('\n') }
+      ])).toContain('visual report client must contain only the approved heartbeat fetch and close beacon');
+    }
+  });
+
+  test('release network policy rejects a wildcard or non-fixed server listener', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const source = [
+      "import http from 'node:http';",
+      "import type { AddressInfo } from 'node:net';",
+      'export const VISUAL_REPORT_SERVER_LIMITS = Object.freeze({',
+      "  host: '0.0.0.0',",
+      '  port: 0',
+      '});',
+      "server.listen(0, '0.0.0.0');"
+    ].join('\n');
+
+    expect(findRuntimeNetworkPolicyViolations([
+      { path: 'src/visual-report/server.ts', source }
+    ])).toContain('visual report server must contain only the approved loopback listener');
+  });
+
+  test('release network policy rejects additional server requests', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+    const approved = [
+      "import http from 'node:http';",
+      "import type { AddressInfo } from 'node:net';",
+      'export const VISUAL_REPORT_SERVER_LIMITS = Object.freeze({',
+      "  host: '127.0.0.1',",
+      '  port: 0',
+      '});',
+      'server.listen(VISUAL_REPORT_SERVER_LIMITS.port, VISUAL_REPORT_SERVER_LIMITS.host);'
+    ];
+
+    for (const extra of [
+      "http.get('http://example.test');",
+      "http.request('http://example.test');"
+    ]) {
+      expect(findRuntimeNetworkPolicyViolations([
+        { path: 'src/visual-report/server.ts', source: [...approved, extra].join('\n') }
+      ])).toContain('visual report server must contain only the approved loopback listener');
+    }
+  });
+
+  test('release network policy rejects every network primitive outside visual report sources', async () => {
+    const { findRuntimeNetworkPolicyViolations } = await loadReleaseNetworkCheck();
+
+    for (const source of [
+      "fetch('/unexpected');",
+      "import http from 'node:http';",
+      "import type { Socket } from 'node:net';",
+      "import https from 'node:https';",
+      "import dns from 'node:dns';",
+      "import tls from 'node:tls';",
+      "new WebSocket('wss://example.test/socket');",
+      "navigator.sendBeacon('https://example.test/collect');",
+      "await runCommand('/usr/bin/curl', ['https://example.test']);"
+    ]) {
+      expect(findRuntimeNetworkPolicyViolations([
+        { path: 'src/cli.ts', source }
+      ])).toEqual([
+        'runtime network primitive detected in src/cli.ts'
+      ]);
+    }
   });
 
   test('ci bootstraps pnpm with corepack instead of setup-node pnpm cache', async () => {
@@ -149,7 +296,7 @@ describe('release readiness', () => {
     expect(output).toContain('Fix readiness   ready');
     expect(output).toContain('Changed         redacted report only');
     expect(output).toContain('Report          <absolute-path>');
-    expect(output).toContain('Review          npm exec --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest');
+    expect(output).toContain(`Review          npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest`);
   });
 
   test('report latest uses the same human safety summary by default', async () => {
@@ -228,10 +375,115 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.5.0');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.6.0');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
+  });
+
+  test('public docs preserve the ephemeral visual-report privacy contract', async () => {
+    const [readme, japaneseReadme, security] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8'),
+      readFile('SECURITY.md', 'utf8')
+    ]);
+    const english = readme.split('## Ephemeral Local Visual Reports', 2)[1]
+      ?.split('## v0.6 Guided Codex Reclaim', 1)[0] ?? '';
+    const japanese = japaneseReadme.split('## ローカルVisual Report（一時表示）', 2)[1]
+      ?.split('## v0.6 Guided Codex Reclaim', 1)[0] ?? '';
+    const securityBoundary = security.split('## Ephemeral Visual-Report Boundary', 2)[1]
+      ?.split('## v0.6 Safety Boundaries and Recovery', 1)[0] ?? '';
+
+    for (const document of [english, securityBoundary]) {
+      for (const expected of [
+        'aidm doctor --html',
+        'aidm report --latest --html',
+        'no HTML file is written',
+        'no upload or external request',
+        'Japanese / English switch',
+        'session-only language preference',
+        '`sessionStorage`',
+        'The zero-file promise applies to HTML only.',
+        'source/tool state',
+        'normal redacted JSON retention',
+        'transient HTML',
+        'browser-controlled history/cache',
+        '`--json`, `--share`, `--show-paths`, `--plain`, and `--no-banner`',
+        'in-memory document, not a temporary file that is later deleted',
+        'does not guarantee perfect browser erasure or APFS byte-for-byte reclaim'
+      ]) {
+        expect(document).toContain(expected);
+      }
+      expect(document).toMatch(/only on the literal loopback address `127\.0\.0\.1`/);
+      expect(document).toMatch(/Closing the page or reaching session expiry destroys .*in-memory view/);
+      expect(document).toMatch(/(?:Browser|browser) history may retain an unusable tokenized loopback URL/);
+      expect(document).toContain('`doctor --html` still follows normal redacted JSON retention: it runs `doctor` and creates its normal redacted JSON report.');
+      expect(document).toContain('`report --latest --html` reads the existing latest redacted JSON report; it performs neither a new diagnosis nor a new report write.');
+      expect(document).toMatch(/cannot execute `plan`, `apply`, or cleanup/);
+      expect(document).toMatch(/not exposed through MCP/);
+    }
+
+    for (const expected of [
+      'aidm doctor --html',
+      'aidm report --latest --html',
+      '`127.0.0.1`',
+      'HTMLファイルは最初から書き込みません',
+      '`sessionStorage`',
+      '`--json`, `--share`, `--show-paths`, `--plain`, `--no-banner`',
+      'zero-fileという約束はHTMLだけが対象です',
+      '元データやツールの状態',
+      '通常保存される伏せ字済みJSONレポート',
+      '一時的なHTML表示',
+      'ブラウザ管理の履歴やキャッシュ',
+      'MCP'
+    ]) {
+      expect(japanese).toContain(expected);
+    }
+    expect(japanese).toMatch(/ループバックアドレス `127\.0\.0\.1` のみに/);
+    expect(japanese).toMatch(/外部へのアップロードやリクエストは.*行いません/);
+    expect(japanese).toMatch(/日本語 \/ 英語に切り替え/);
+    expect(japanese).toMatch(/現在のブラウザセッション中だけ有効/);
+    expect(japanese).toMatch(/ページを閉じるかセッションの有効期限が切れると.*メモリ上の表示を破棄/);
+    expect(japanese).toMatch(/`doctor --html` は通常どおり診断を行い.*伏せ字済みJSONレポートを作成・保持/);
+    expect(japanese).toMatch(/`report --latest --html` は既存の最新の伏せ字済みJSONレポートを読み取り.*新たな診断もレポート書き込みも行いません/);
+    expect(japanese).toMatch(/メモリ上だけの文書.*後から削除される一時ファイルではありません/);
+    expect(japanese).toMatch(/利用できないトークン付きのループバックURL/);
+    expect(japanese).toMatch(/ブラウザデータの完全な消去.*APFS.*byte-for-byte reclaim.*保証しません/);
+    expect(japanese).toMatch(/`plan` \/ `apply` \/ cleanupを実行できず/);
+    expect(japanese).toMatch(/MCPにも公開されません/);
+  });
+
+  test('each README publishes the exact implemented HTML command syntax', async () => {
+    const commandSyntax = [
+      'ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--html] [--no-banner]',
+      'ai-dev-maintenance report --latest [--show-paths] [--json] [--html]',
+      'aidm doctor [--json] [--show-paths] [--share] [--html] [--no-banner]',
+      'aidm report --latest [--show-paths] [--json] [--html]'
+    ];
+
+    for (const [name, document] of [
+      ['README.md', await readFile('README.md', 'utf8')],
+      ['README.ja.md', await readFile('README.ja.md', 'utf8')]
+    ] as const) {
+      for (const syntax of commandSyntax) {
+        expect(document, name).toContain(syntax);
+      }
+    }
+  });
+
+  test('Unreleased release notes retain the visual-report boundary', async () => {
+    const changelog = await readFile('CHANGELOG.md', 'utf8');
+    const unreleased = changelog.split('## Unreleased', 2)[1]?.split('\n## ', 1)[0] ?? '';
+
+    for (const expected of [
+      'aidm doctor --html',
+      'aidm report --latest --html',
+      'local-only',
+      'memory-only',
+      'CLI-only'
+    ]) {
+      expect(unreleased).toContain(expected);
+    }
   });
 
   test('readmes document CLI exit codes', async () => {
@@ -630,7 +882,7 @@ describe('release readiness', () => {
     const readme = await readFile('README.md', 'utf8');
     const changelog = await readFile('CHANGELOG.md', 'utf8');
 
-    expect(readme).toContain('v0.5.x currently supports macOS only');
+    expect(readme).toContain('v0.6.x currently supports macOS only');
     expect(readme).not.toMatch(/v0\.[234]\.x currently supports macOS only/);
     expect(countOccurrences(readme, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
     expect(countOccurrences(changelog, 'aiCpuPercent no longer includes non-AI processes')).toBe(1);
@@ -687,8 +939,8 @@ describe('release readiness', () => {
 
     expect(readmes).toContain('ai-dev-maintenance history [--json] [--plain]');
     expect(readmes).toContain('ai-dev-maintenance trust [--json]');
-    expect(readmes).toContain('ai-dev-maintenance plan codex-fix|cursor-clean [--json]');
-    expect(readmes).toContain('ai-dev-maintenance apply --plan <planId> --yes [--json]');
+    expect(readmes).toContain('ai-dev-maintenance plan codex-fix|cursor-clean|codex-sparkle-clean [--json]');
+    expect(readmes).toContain('ai-dev-maintenance apply --plan <planId> --yes [--accept-image-loss] [--json]');
     expect(readmes).toContain('ai-dev-maintenance mcp serve');
     expect(readmes).toContain('aidm mcp serve');
     expect(readmes).toContain('allowlist');
@@ -712,6 +964,269 @@ describe('release readiness', () => {
     expect(readmes).toContain('MCP doctor requestはreportを書き込まず、historyにも残りません');
     expect(readmes).toContain('approval means a human runs `aidm apply --plan <planId> --yes`');
     expect(readmes).toContain('承認とは、人間が `aidm apply --plan <planId> --yes` を実行すること');
+  });
+
+  test('v0.6 readmes document exact guided reclaim commands and defaults', async () => {
+    const [readme, japaneseReadme] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8')
+    ]);
+    const english = readme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## Tracked State Scope', 1)[0] ?? '';
+    const japanese = japaneseReadme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## 追跡対象の状態と互換性', 1)[0] ?? '';
+
+    expect(english).toContain('reclaim scan codex-session-images');
+    expect(english).toContain('--older-than-days 30');
+    expect(english).toContain('--min-file-size-mb 50');
+    expect(english).toContain('aidm apply --plan <planId> --yes --accept-image-loss');
+    expect(japanese).toContain('reclaim scan codex-session-images');
+    expect(japanese).toContain('--older-than-days 30');
+    expect(japanese).toContain('--min-file-size-mb 50');
+    expect(japanese).toContain('aidm apply --plan <planId> --yes --accept-image-loss');
+  });
+
+  test('v0.6 readmes retain each bilingual Step 1 safety boundary', async () => {
+    const [readme, japaneseReadme] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8')
+    ]);
+    const english = readme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## Tracked State Scope', 1)[0] ?? '';
+    const japanese = japaneseReadme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## 追跡対象の状態と互換性', 1)[0] ?? '';
+
+    expect(english).toContain('doctor remains metadata-only');
+    expect(english).toContain('reads session files');
+    expect(english).toContain('irreversible and CLI-only');
+    expect(english).toContain('does not change Codex native-compression configuration');
+    expect(english).toContain('exact Codex Sparkle');
+    expect(english).toContain('only when every safety check passes');
+    expect(english).toContain('The monitor is **opt-in**');
+    expect(english).toContain('scheduled run persists the monitor state and latest report');
+    expect(english).toContain('MCP cannot invoke these new actions');
+    expect(english).toContain('not auditable from files alone');
+
+    expect(japanese).toContain('doctor はmetadata-onlyのまま');
+    expect(japanese).toContain('session fileを読みます');
+    expect(japanese).toContain('不可逆かつCLI限定');
+    expect(japanese).toContain('Codex native-compressionの設定を変更しません');
+    expect(japanese).toContain('正確なCodex Sparkle');
+    expect(japanese).toContain('すべての安全確認に合格した場合だけ');
+    expect(japanese).toContain('monitorは `opt-in` です');
+    expect(japanese).toContain('ローカルstateを書き込みます');
+    expect(japanese).toContain('MCPはこれらの新しいactionを呼び出せません');
+    expect(japanese).toContain('ファイルだけから監査できません');
+  });
+
+  test('v0.6 readmes document recovery and monitor persistence contracts', async () => {
+    const [readme, japaneseReadme] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8')
+    ]);
+    const english = readme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## Tracked State Scope', 1)[0] ?? '';
+    const japanese = japaneseReadme.split('## v0.6 Guided Codex Reclaim', 2)[1]?.split('## 追跡対象の状態と互換性', 1)[0] ?? '';
+
+    expect(english).toContain('manifest mode `0600`');
+    expect(english).toContain('global preflight failure changes nothing');
+    expect(english).toContain('post-mutation failure returns `partial` and consumes the plan');
+    expect(english).toContain('install writes the LaunchAgent plist and bootstraps it');
+    expect(english).toContain('Manual `aidm monitor codex-sessions` is metadata-only and does not persist');
+    expect(english).toContain('scheduled run persists the monitor state and latest report');
+    expect(english).toContain('Notification delivery is best-effort');
+    expect(english).toContain('Reinstall after either validated Node or AIDM path moves');
+    expect(japanese).toContain('manifest mode `0600`');
+    expect(japanese).toContain('global preflight failureなら変更しません');
+    expect(japanese).toContain('post-mutation failureは `partial` となりplanを消費します');
+    expect(japanese).toContain('installはLaunchAgent plistを書き込みbootstrapします');
+    expect(japanese).toContain('手動 `aidm monitor codex-sessions` はmetadata-onlyでpersistしません');
+    expect(japanese).toContain('scheduled runがmonitor stateとlatest reportをpersistします');
+    expect(japanese).toContain('notification deliveryはbest-effort');
+    expect(japanese).toContain('validated Node/AIDM pathを移動したらmonitorをreinstall');
+  });
+
+  const assertPathFree = (value: string, label: string): void => {
+    const pathPattern = /(?:^|[\s"'(=:`\[,])(?:file:\/\/[^\s"'()]+|[A-Za-z]:[\\/][^\s"'()]+|\\\\[^\\/\s]+(?:[\\/][^\\/\s"'()]+)+|\/(?!\/)[^\s"'()]+)/i;
+    expect(value, label).not.toMatch(pathPattern);
+  };
+
+  const collectStrings = (value: unknown, label: string): void => {
+    if (Array.isArray(value)) {
+      value.forEach((child, index) => collectStrings(child, `${label}[${index}]`));
+    } else if (typeof value === 'string') {
+      assertPathFree(value, label);
+    } else if (value !== null && typeof value === 'object') {
+      Object.entries(value).forEach(([key, child]) => collectStrings(child, `${label}.${key}`));
+    }
+  };
+
+  test('path-free helper rejects embedded local paths but allows ordinary text', () => {
+    for (const value of [
+      'path=/Users/a',
+      'location: C:\\Users\\a',
+      'source=file:///Users/a',
+      'backup=\\\\server\\share\\a'
+    ]) {
+      expect(() => assertPathFree(value, value)).toThrow();
+    }
+    for (const value of [
+      '--yes --accept-image-loss',
+      'copy: 100.0 MiB; version 0.6.0',
+      'See https://example.com/docs'
+    ]) {
+      expect(() => assertPathFree(value, value)).not.toThrow();
+    }
+  });
+
+  test('v0.6 public examples validate against Task14 schemas and stay synthetic', async () => {
+    const cases = [
+      {
+        examplePath: 'examples/reclaim-session-images.json',
+        schemaPath: 'schemas/reclaim-scan-result.v1.schema.json',
+        expected: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'reclaim scan codex-session-images',
+          status: 'ok',
+          contentRead: true,
+          filters: { olderThanDays: 30, minFileSizeBytes: 52_428_800 },
+          totals: {
+            filesConsidered: 3,
+            filesOpened: 2,
+            filesSkippedBySize: 1,
+            filesSkippedAfterRead: 0,
+            filesBlocked: 0,
+            sourceBytes: 104_857_600,
+            projectedBytes: 20_971_520,
+            reclaimableBytes: 83_886_080,
+            occurrencesSeen: 4,
+            imagesPrunable: 3,
+            knownPlaceholders: 1,
+            belowMinimum: 0,
+            candidateFiles: 2
+          },
+          blockedReasons: [],
+          warnings: ['size-filtered-estimate-is-lower-bound']
+        }
+      },
+      {
+        examplePath: 'examples/native-compression-status.json',
+        schemaPath: 'schemas/native-compression-status.v1.schema.json',
+        expected: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'reclaim status codex-native-compression',
+          status: 'ok',
+          supported: true,
+          featureStage: 'stable',
+          defaultEnabled: false,
+          configuredState: 'unknown',
+          plainJsonlFiles: 4,
+          compressedJsonlFiles: 1,
+          warnings: [],
+          nextActions: [
+            'Prune eligible session images before enabling native compression.',
+            'Use the official Codex CLI to manage this feature; AIDM will not edit configuration.'
+          ]
+        }
+      },
+      {
+        examplePath: 'examples/codex-session-monitor.json',
+        schemaPath: 'schemas/codex-session-monitor-result.v1.schema.json',
+        expected: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'monitor codex-sessions',
+          status: 'ok',
+          currentBytes: 10 * 1024 ** 3,
+          previousBytes: 4 * 1024 ** 3,
+          deltaBytes: 6 * 1024 ** 3,
+          thresholdBytes: 8 * 1024 ** 3,
+          growthThresholdBytes: 5 * 1024 ** 3,
+          alert: true,
+          statePersisted: false,
+          notificationAttempted: false,
+          warnings: []
+        }
+      }
+    ] as const;
+    const ajv = new Ajv({ allErrors: true, strict: true });
+    const forbiddenKeys = new Set([
+      'path', 'absolutePath', 'sessionContent', 'sessionText', 'candidates',
+      'privateCandidates', 'sourceSha256', 'identity', 'manifest', 'manifestPath',
+      'privateOutcomes'
+    ]);
+    for (const { examplePath, schemaPath, expected } of cases) {
+      const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
+      const example = JSON.parse(await readFile(examplePath, 'utf8'));
+      const validate = ajv.compile(schema);
+      expect(validate(example), `${examplePath}: ${JSON.stringify(validate.errors, null, 2)}`).toBe(true);
+      expect(example).toEqual(expected);
+      const keys: string[] = [];
+      const collectKeys = (value: unknown): void => {
+        if (Array.isArray(value)) {
+          value.forEach(collectKeys);
+        } else if (value !== null && typeof value === 'object') {
+          for (const [key, child] of Object.entries(value)) {
+            keys.push(key);
+            collectKeys(child);
+          }
+        }
+      };
+      collectKeys(example);
+      expect(keys.filter((key) => forbiddenKeys.has(key))).toEqual([]);
+      collectStrings(example, `${examplePath}:$`);
+      expect(JSON.stringify(example)).not.toMatch(/(?:session contents|username|manifest)/i);
+    }
+  });
+
+  test('v0.6 reclaim human example preserves renderer safety wording without local identity', async () => {
+    const example = await readFile('examples/reclaim-session-images.txt', 'utf8');
+
+    expect(example).toContain('Content access  Reads candidate Codex session JSONL contents locally; no session content is printed or uploaded.');
+    for (const row of [
+      'Image scan      ok',
+      'Content read    yes',
+      'Candidate files 2',
+      'Files opened    2',
+      'Files blocked   0',
+      'Images          3',
+      'Source size     100.0 MiB',
+      'Projected size  20.0 MiB',
+      'Reclaimable     80.0 MiB',
+      'Changed         nothing; estimate only',
+      'Warning         size-filtered-estimate-is-lower-bound'
+    ]) {
+      expect(example).toContain(row);
+    }
+    expect(example).toContain('Consent         Irreversible image loss; apply requires both --yes and --accept-image-loss.');
+    example.split(/\r?\n/).forEach((line, lineIndex) => {
+      assertPathFree(line, `human example line ${lineIndex}`);
+      line.split(/\s+/).filter(Boolean).forEach((token, tokenIndex) => {
+        assertPathFree(token, `human example line ${lineIndex} token ${tokenIndex}`);
+      });
+    });
+    expect(example).not.toMatch(/(?:plan[- ]?[0-9a-f]{4,}|manifest|username)/i);
+  });
+
+  test('v0.6 readmes state supported homes metrics and bounded exclusions', async () => {
+    const [readme, japaneseReadme] = await Promise.all([
+      readFile('README.md', 'utf8'),
+      readFile('README.ja.md', 'utf8')
+    ]);
+
+    expect(readme).toContain('custom `CODEX_HOME` (anything other than `$HOME/.codex`)');
+    expect(readme).toContain('`.jsonl.zst`');
+    expect(readme).toContain('no unattended deletion');
+    expect(readme).toContain('Free-space delta');
+    expect(readme).toContain('`volumeFreeDeltaBytes`');
+    expect(readme).toContain('free-space equality is not guaranteed');
+    expect(readme).toContain('No universal compression ratio, including `104x`, is promised');
+    expect(readme).not.toContain('AIDM does not clean Codex sessions or Sparkle.');
+    expect(japaneseReadme).toContain('custom `CODEX_HOME`（`$HOME/.codex` 以外）');
+    expect(japaneseReadme).toContain('`.jsonl.zst`');
+    expect(japaneseReadme).toContain('unattended deletionはありません');
+    expect(japaneseReadme).toContain('Free-space delta');
+    expect(japaneseReadme).toContain('`volumeFreeDeltaBytes`');
+    expect(japaneseReadme).toContain('free-space equalityは保証しません');
+    expect(japaneseReadme).toContain('`104x`を含む）は約束しません');
+    expect(japaneseReadme).not.toContain('AIDMはCodexのsessionやSparkleをcleanupしません。');
   });
 
   test('readmes document release workflow provenance posture', async () => {

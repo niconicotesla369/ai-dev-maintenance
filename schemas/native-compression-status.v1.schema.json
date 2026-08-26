@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/native-compression-status.v1.schema.json",
+  "title": "AIDM Codex Native Compression Status v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "command",
+    "status",
+    "supported",
+    "configuredState",
+    "plainJsonlFiles",
+    "compressedJsonlFiles",
+    "warnings",
+    "nextActions"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "toolVersion": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "command": { "const": "reclaim status codex-native-compression" },
+    "status": { "enum": ["ok", "partial", "unsupported"] },
+    "supported": { "type": "boolean" },
+    "featureStage": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_-]*(?: [a-z0-9_-]+)*$"
+    },
+    "defaultEnabled": { "type": "boolean" },
+    "configuredState": { "const": "unknown" },
+    "plainJsonlFiles": { "$ref": "#/definitions/nonNegativeInteger" },
+    "compressedJsonlFiles": { "$ref": "#/definitions/nonNegativeInteger" },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "codex-executable-untrusted",
+          "codex-executable-drift",
+          "native-feature-check-unavailable",
+          "codex-executable-snapshot-cleanup-failed",
+          "native-feature-command-stderr",
+          "native-feature-output-invalid",
+          "native-feature-unavailable",
+          "custom-codex-home-unsupported",
+          "session-metadata-scan-incomplete"
+        ]
+      }
+    },
+    "nextActions": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "Prune eligible session images before enabling native compression.",
+          "Use the official Codex CLI to manage this feature; AIDM will not edit configuration.",
+          "Retry after verifying the bundled Codex executable.",
+          "AIDM will not edit Codex configuration.",
+          "Update Codex and run this status check again."
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

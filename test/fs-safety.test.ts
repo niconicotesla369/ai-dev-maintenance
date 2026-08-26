@@ -1,4 +1,4 @@
-import { chmod, link, mkdir, readdir, symlink, writeFile } from 'node:fs/promises';
+import { chmod, link, mkdir, readdir, realpath, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -8,6 +8,8 @@ import {
   assertSafeReadablePrivateFile,
   compareTargetIdentities,
   detectTargetState,
+  inspectSafeExecutable,
+  sameExecutableIdentity,
   safeTargetStateForReport
 } from '../src/fs-safety.js';
 
@@ -132,6 +134,76 @@ describe('filesystem target safety', () => {
       symbolicLink: false,
       size: 4
     });
+  });
+
+  test('accepts only a canonical private or root-owned regular executable', async () => {
+    const created = await makeTempDir();
+    const root = await realpath(created);
+    const executable = path.join(root, 'codex');
+    try {
+      await writeFile(executable, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+
+      const inspection = await inspectSafeExecutable(executable, '<codex-executable>');
+
+      expect(inspection).toMatchObject({ safe: true, blockers: [] });
+      expect(inspection.identity).toMatchObject({
+        pathCategory: '<codex-executable>',
+        realpath: executable,
+        regularFile: true,
+        symbolicLink: false,
+        nlink: 1
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('rejects relative, symlinked, hardlinked, writable, and non-executable commands', async () => {
+    const created = await makeTempDir();
+    const root = await realpath(created);
+    const executable = path.join(root, 'codex');
+    const alias = path.join(root, 'codex-link');
+    const hardlink = path.join(root, 'codex-hardlink');
+    try {
+      await writeFile(executable, '#!/bin/sh\n', { mode: 0o700 });
+      await symlink(executable, alias);
+      expect((await inspectSafeExecutable('relative-codex', '<codex-executable>')).blockers)
+        .toContain('executable-path-invalid');
+      expect((await inspectSafeExecutable(alias, '<codex-executable>')).blockers)
+        .toContain('executable-symlink');
+
+      await link(executable, hardlink);
+      expect((await inspectSafeExecutable(executable, '<codex-executable>')).blockers)
+        .toContain('executable-hardlinked');
+      await unlink(hardlink);
+
+      await chmod(executable, 0o722);
+      expect((await inspectSafeExecutable(executable, '<codex-executable>')).blockers)
+        .toContain('executable-mode-unsafe');
+      await chmod(executable, 0o600);
+      expect((await inspectSafeExecutable(executable, '<codex-executable>')).blockers)
+        .toContain('executable-not-executable');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  test('compares executable identity without trusting only its path', async () => {
+    const created = await makeTempDir();
+    const root = await realpath(created);
+    const executable = path.join(root, 'codex');
+    try {
+      await writeFile(executable, '#!/bin/sh\n', { mode: 0o700 });
+      const before = await inspectSafeExecutable(executable, '<codex-executable>');
+      await writeFile(executable, '#!/bin/sh\n# drift\n', { mode: 0o700 });
+      const after = await inspectSafeExecutable(executable, '<codex-executable>');
+
+      expect(before.identity).toBeDefined();
+      expect(after.identity).toBeDefined();
+      expect(sameExecutableIdentity(before.identity!, after.identity!)).toBe(false);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

@@ -2,9 +2,52 @@
 
 Safely diagnose complete, disjoint Codex tracked state and current volume context without confusing tracked bytes with reclaimable disk space.
 
-v0.5.0 diagnoses every regular file under `CODEX_HOME` through known disjoint buckets plus private `other-state`, adds metadata-only volume context and lower-bound warnings, and keeps the distinction between tracked state and reclaimable bytes explicit. It also diagnoses Claude Code and Cursor local state, includes guarded Cursor cache/log cleanup, adds terminal-native pretty output for the guided check and live pressure check with a defensible overall pressure level, and adds path-free `doctor --share` and `pressure --share` cards for public posting. Machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust` remain available.
+v0.6.0 keeps the v0.5 tracked-state compatibility contract and adds guided, opt-in Codex reclaim workflows: explicit image estimates, conditional exact-Sparkle cleanup, native-compression status, and an optional local session monitor. The live CPU/RAM pressure check still reports an overall pressure level with terminal-native pretty output. Machine-readable JSON contracts, local `plan` / `apply`, read-only history, an experimental stdio-only MCP server, and `aidm trust` remain available.
 
 `doctor` only reads file-size and volume metadata with `lstat`/`readdir`/`statfs` and writes a local redacted report. It does not read chat contents, open application databases, upload data, delete files, rewrite session history, install database triggers, or change tool configuration.
+
+## Ephemeral Local Visual Reports
+
+Open the CLI-only, read-only visual report locally with either command:
+
+```bash
+aidm doctor --html
+aidm report --latest --html
+```
+
+AIDM serves the visual report only on the literal loopback address `127.0.0.1`; it makes no upload or external request. “Ephemeral HTML” means an in-memory document, not a temporary file that is later deleted: no HTML file is written. The Japanese / English switch stores a session-only language preference in `sessionStorage`. Closing the page or reaching session expiry destroys AIDM's in-memory view and makes its tokenized URL unusable.
+
+The zero-file promise applies to HTML only. Keep source/tool state, the normally retained redacted JSON report, the transient HTML view, and browser-controlled history/cache separate. `doctor --html` still follows normal redacted JSON retention: it runs `doctor` and creates its normal redacted JSON report. `report --latest --html` reads the existing latest redacted JSON report; it performs neither a new diagnosis nor a new report write. The display itself creates no source copy and mutates no tool state.
+
+Browser history may retain an unusable tokenized loopback URL after the view ends. AIDM sends `Cache-Control: no-store`, but browser-controlled history/cache remains outside its control; AIDM does not guarantee perfect browser erasure or APFS byte-for-byte reclaim.
+
+The visual report can reveal and copy only fixed, allowlisted plan commands. It cannot execute `plan`, `apply`, or cleanup, and it is not exposed through MCP. HTML mode is incompatible with `--json`, `--share`, `--show-paths`, `--plain`, and `--no-banner`.
+
+## v0.6 Guided Codex Reclaim
+
+`doctor remains metadata-only`: it never reads session bodies. `reclaim scan codex-session-images` is a separate explicit command and **reads session files** only to estimate embedded image payloads. Its defaults are `--older-than-days 30` and `--min-file-size-mb 50` (binary MiB); it creates no plan and rewrites nothing.
+
+```bash
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim scan codex-session-images
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim status codex-native-compression
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- monitor codex-sessions
+aidm plan codex-session-image-prune --older-than-days 30 --min-file-size-mb 50
+aidm apply --plan <planId> --yes --accept-image-loss
+aidm plan codex-sparkle-clean
+aidm apply --plan <planId> --yes
+aidm plan codex-session-monitor-install --threshold-gib 8 --growth-gib 5
+aidm apply --plan <planId> --yes
+aidm plan codex-session-monitor-remove
+aidm apply --plan <planId> --yes
+```
+
+Image pruning is **irreversible and CLI-only**: it is never scheduled or exposed through MCP, requires the exact matching plan plus both confirmations, and has no unattended deletion. It supports only default `$HOME/.codex`, inactive plain `*.jsonl`, and files that pass every revalidation; custom `CODEX_HOME` (anything other than `$HOME/.codex`) and `.jsonl.zst` are unsupported and block the action. A recovery manifest with manifest mode `0600` is written to `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl`. A legacy anonymous placeholder is **not auditable from files alone**, so it is not attributed to AIDM.
+
+Successful apply reports logical `Reclaimed` bytes and, when measurable, the human `Free-space delta`; JSON uses `volumeFreeDeltaBytes`. They are distinct measurements: APFS accounting and concurrent writes mean free-space equality is not guaranteed. A global preflight failure changes nothing; a post-mutation failure returns `partial` and consumes the plan, leaving stable manifest evidence. No universal compression ratio, including `104x`, is promised.
+
+Native status is advisory and **does not change Codex native-compression configuration**, read `config.toml`, recompress sessions, or expand `.zst`. Sparkle cleanup targets the **exact Codex Sparkle** root `<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` and only `Installation/*`; it runs **only when every safety check passes**. `Launcher/`, `PersistentDownloads/`, generic updater paths, and native configuration remain untouched.
+
+The monitor is **opt-in**. Manual `aidm monitor codex-sessions` is metadata-only and does not persist. The explicit plan/apply install writes the LaunchAgent plist and bootstraps it at `<home>/Library/LaunchAgents/com.niconicotesla369.ai-dev-maintenance.codex-session-monitor.plist`; the scheduled run persists the monitor state and latest report at `<home>/.ai-dev-maintenance/monitor/` (`codex-sessions-state.v1.json`, `codex-sessions-latest.v1.json`). Default scheduling is day 1 at 04:30 local time (`LowPriorityIO=true`, `Nice=10`), with 8 GiB total and 5 GiB growth thresholds. Notification delivery is best-effort; a failure is a warning and never starts cleanup. Reinstall after either validated Node or AIDM path moves. MCP cannot invoke these new actions.
 
 ## Tracked State Scope and Compatibility
 
@@ -12,7 +55,7 @@ v0.5.0 diagnoses every regular file under `CODEX_HOME` through known disjoint bu
 
 When a custom `CODEX_HOME` overlaps the exact Sparkle root, boundary-safe path ownership emits their union once: the wider root owns it, with custom ownership winning an equal-root tie. A custom owner keeps its private buckets and remainder; a wider Sparkle owner is conservatively `never`, not review-first.
 
-When disjoint, the exact `org.sparkle-project.Sparkle` cache at `<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` is visible as review-first and is never auto-deleted. Generic updater globs are not scanned or cleaned. AIDM does not clean Codex sessions or Sparkle.
+When disjoint, the exact `org.sparkle-project.Sparkle` cache at `<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` is visible as review-first and is never auto-deleted. Generic updater globs are not scanned or cleaned. `doctor` and automatic cleanup do not target Codex sessions or Sparkle; the v0.6 explicit, revalidated CLI `plan` / `apply` actions above are the limited exceptions.
 
 In addition to the metadata-only file-size scan, `doctor` uses `statfs` for metadata-only volume context; it does not read file contents. A truncated scan reports a lower bound, so its bytes are a minimum rather than a complete measurement. Provider logical bytes and volume allocated usage are different measurements, which makes tracked-share percentages diagnostic, not causal evidence of disk pressure.
 
@@ -37,7 +80,7 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.5.0
+npx --yes ai-dev-maintenance@0.6.0
 ```
 
 In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
@@ -46,13 +89,13 @@ In a normal terminal this starts the guided Codex cleanup flow. It diagnoses fir
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -60,7 +103,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.5.0
+npm install -g ai-dev-maintenance@0.6.0
 aidm
 ```
 
@@ -71,19 +114,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -91,8 +134,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.
@@ -110,35 +153,47 @@ ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--pla
 ai-dev-maintenance --help | -h
 ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
-ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
+ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--html] [--no-banner]
 ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]
 ai-dev-maintenance history [--json] [--plain]
 ai-dev-maintenance trust [--json]
+ai-dev-maintenance reclaim scan codex-session-images [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+ai-dev-maintenance reclaim status codex-native-compression [--json]
+ai-dev-maintenance monitor codex-sessions [--json]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
-ai-dev-maintenance report --latest [--show-paths]
+ai-dev-maintenance report --latest [--show-paths] [--json] [--html]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
 ai-dev-maintenance restore validate --backup <path>
-ai-dev-maintenance plan codex-fix|cursor-clean [--json]
-ai-dev-maintenance apply --plan <planId> --yes [--json]
+ai-dev-maintenance plan codex-fix|cursor-clean|codex-sparkle-clean [--json]
+ai-dev-maintenance plan codex-session-image-prune [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+ai-dev-maintenance plan codex-session-monitor-install [--threshold-gib <GiB>] [--growth-gib <GiB>] [--json]
+ai-dev-maintenance plan codex-session-monitor-remove [--json]
+ai-dev-maintenance apply --plan <planId> --yes [--accept-image-loss] [--json]
 ai-dev-maintenance mcp serve
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
-aidm doctor [--json] [--show-paths] [--share] [--no-banner]
+aidm doctor [--json] [--show-paths] [--share] [--html] [--no-banner]
 aidm pressure [--json] [--share] [--no-banner] [--plain]
 aidm history [--json] [--plain]
 aidm trust [--json]
+aidm reclaim scan codex-session-images [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+aidm reclaim status codex-native-compression [--json]
+aidm monitor codex-sessions [--json]
 aidm cursor clean --safe [--yes]
 aidm fix --safe --yes
-aidm report --latest [--show-paths]
+aidm report --latest [--show-paths] [--json] [--html]
 aidm reports prune --yes
 aidm backups prune --yes
 aidm restore validate --backup <path>
-aidm plan codex-fix|cursor-clean [--json]
-aidm apply --plan <planId> --yes [--json]
+aidm plan codex-fix|cursor-clean|codex-sparkle-clean [--json]
+aidm plan codex-session-image-prune [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+aidm plan codex-session-monitor-install [--threshold-gib <GiB>] [--growth-gib <GiB>] [--json]
+aidm plan codex-session-monitor-remove [--json]
+aidm apply --plan <planId> --yes [--accept-image-loss] [--json]
 aidm mcp serve
 ```
 
@@ -265,7 +320,7 @@ This only validates a backup. Do not move, copy, or replace database files unles
 
 ## Platform Support
 
-v0.5.x currently supports macOS only. Other platforms exit before touching macOS-specific paths.
+v0.6.x currently supports macOS only. Other platforms exit before touching macOS-specific paths. The v0.5.0 tracked-state wording and schema-v2 notes remain historical compatibility documentation.
 
 ## Development
 

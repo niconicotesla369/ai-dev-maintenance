@@ -5,6 +5,8 @@ import { Ajv } from 'ajv';
 import { describe, expect, test } from 'vitest';
 import { runCli } from '../src/cli.js';
 
+const privatePath = (...segments: string[]) => ['', 'Users', 'example', ...segments].join('/');
+
 const schemaCases = [
   {
     schemaPath: 'schemas/codex-report.v1.schema.json',
@@ -96,6 +98,216 @@ describe('published JSON schema contracts', () => {
       await rm(home, { recursive: true, force: true });
     }
   }, 20_000);
+
+  test('standalone public result schemas validate representative redacted outputs', async () => {
+    const cases = [
+      {
+        schemaPath: 'schemas/reclaim-scan-result.v1.schema.json',
+        value: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'reclaim scan codex-session-images',
+          status: 'ok',
+          contentRead: true,
+          filters: { olderThanDays: 30, minFileSizeBytes: 52_428_800 },
+          totals: {
+            filesConsidered: 3,
+            filesOpened: 2,
+            filesSkippedBySize: 1,
+            filesSkippedAfterRead: 0,
+            filesBlocked: 0,
+            sourceBytes: 104_857_600,
+            projectedBytes: 20_971_520,
+            reclaimableBytes: 83_886_080,
+            occurrencesSeen: 4,
+            imagesPrunable: 3,
+            knownPlaceholders: 1,
+            belowMinimum: 0,
+            candidateFiles: 2
+          },
+          blockedReasons: [],
+          warnings: ['size-filtered-estimate-is-lower-bound']
+        }
+      },
+      {
+        schemaPath: 'schemas/native-compression-status.v1.schema.json',
+        value: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'reclaim status codex-native-compression',
+          status: 'partial',
+          supported: false,
+          configuredState: 'unknown',
+          plainJsonlFiles: 4,
+          compressedJsonlFiles: 1,
+          warnings: ['native-feature-check-unavailable'],
+          nextActions: ['Retry after verifying the bundled Codex executable.']
+        }
+      },
+      {
+        schemaPath: 'schemas/codex-session-monitor-result.v1.schema.json',
+        value: {
+          schemaVersion: 1,
+          toolVersion: '0.6.0',
+          command: 'monitor codex-sessions',
+          status: 'blocked',
+          currentBytes: 0,
+          thresholdBytes: 8_589_934_592,
+          growthThresholdBytes: 5_368_709_120,
+          alert: false,
+          statePersisted: false,
+          notificationAttempted: false,
+          warnings: ['session-root-untrusted']
+        }
+      }
+    ] as const;
+
+    for (const { schemaPath, value } of cases) {
+      const validate = await validatorFor(schemaPath);
+      expect(validate(value), `${schemaPath}: ${JSON.stringify(validate.errors, null, 2)}`).toBe(true);
+    }
+  });
+
+  test('standalone public result schemas reject private and unexpected output fields', async () => {
+    const scan = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'reclaim scan codex-session-images',
+      status: 'blocked',
+      contentRead: true,
+      filters: { olderThanDays: 30, minFileSizeBytes: 52_428_800 },
+      totals: {
+        filesConsidered: 0,
+        filesOpened: 0,
+        filesSkippedBySize: 0,
+        filesSkippedAfterRead: 0,
+        filesBlocked: 0,
+        sourceBytes: 0,
+        projectedBytes: 0,
+        reclaimableBytes: 0,
+        occurrencesSeen: 0,
+        imagesPrunable: 0,
+        knownPlaceholders: 0,
+        belowMinimum: 0,
+        candidateFiles: 0
+      },
+      blockedReasons: ['unsafe-sessions-root'],
+      warnings: []
+    };
+    const native = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'reclaim status codex-native-compression',
+      status: 'unsupported',
+      supported: false,
+      configuredState: 'unknown',
+      plainJsonlFiles: 0,
+      compressedJsonlFiles: 0,
+      warnings: ['codex-executable-untrusted'],
+      nextActions: ['Update Codex and run this status check again.']
+    };
+    const monitor = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'monitor codex-sessions',
+      status: 'partial',
+      currentBytes: 8_589_934_592,
+      thresholdBytes: 8_589_934_592,
+      growthThresholdBytes: 5_368_709_120,
+      alert: true,
+      statePersisted: true,
+      notificationAttempted: true,
+      notificationDelivered: false,
+      warnings: ['session-metadata-scan-incomplete']
+    };
+
+    const validateScan = await validatorFor('schemas/reclaim-scan-result.v1.schema.json');
+    for (const privateField of [
+      { path: privatePath('.codex', 'sessions', 'private.jsonl') },
+      { candidates: [{ identity: { dev: 1, ino: 2 } }] },
+      { sourceSha256: 'a'.repeat(64) },
+      { privateOutcomes: [{ code: 'unsafe-file' }] },
+      { sessionText: 'private session contents' }
+    ]) {
+      expect(validateScan({ ...scan, ...privateField })).toBe(false);
+    }
+
+    const validateNative = await validatorFor('schemas/native-compression-status.v1.schema.json');
+    expect(validateNative({ ...native, executablePath: '/Applications/Codex.app/Contents/Resources/codex' })).toBe(false);
+
+    const validateMonitor = await validatorFor('schemas/codex-session-monitor-result.v1.schema.json');
+    expect(validateMonitor({ ...monitor, sessionText: 'private session contents' })).toBe(false);
+  });
+
+  test('standalone public result schemas reject sensitive-looking public string values', async () => {
+    const validateScan = await validatorFor('schemas/reclaim-scan-result.v1.schema.json');
+    const scan = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'reclaim scan codex-session-images',
+      status: 'blocked',
+      contentRead: true,
+      filters: { olderThanDays: 30, minFileSizeBytes: 52_428_800 },
+      totals: {
+        filesConsidered: 0,
+        filesOpened: 0,
+        filesSkippedBySize: 0,
+        filesSkippedAfterRead: 0,
+        filesBlocked: 0,
+        sourceBytes: 0,
+        projectedBytes: 0,
+        reclaimableBytes: 0,
+        occurrencesSeen: 0,
+        imagesPrunable: 0,
+        knownPlaceholders: 0,
+        belowMinimum: 0,
+        candidateFiles: 0
+      },
+      blockedReasons: [],
+      warnings: []
+    };
+    expect(validateScan({ ...scan, toolVersion: privatePath('private.jsonl') })).toBe(false);
+    expect(validateScan({ ...scan, toolVersion: '1.2.3-01' })).toBe(false);
+    expect(validateScan({ ...scan, blockedReasons: ['private session contents'] })).toBe(false);
+    expect(validateScan({ ...scan, warnings: ['a'.repeat(64)] })).toBe(false);
+
+    const native = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'reclaim status codex-native-compression',
+      status: 'partial',
+      supported: false,
+      configuredState: 'unknown',
+      plainJsonlFiles: 0,
+      compressedJsonlFiles: 0,
+      warnings: ['native-feature-check-unavailable'],
+      nextActions: ['Retry after verifying the bundled Codex executable.']
+    };
+    const validateNative = await validatorFor('schemas/native-compression-status.v1.schema.json');
+    expect(validateNative({ ...native, toolVersion: '{"dev":1,"ino":2}' })).toBe(false);
+    expect(validateNative({ ...native, toolVersion: '1.2.3-01' })).toBe(false);
+    expect(validateNative({ ...native, featureStage: privatePath('private.jsonl') })).toBe(false);
+    expect(validateNative({ ...native, warnings: ['private session contents'] })).toBe(false);
+    expect(validateNative({ ...native, nextActions: ['{"identity":{"dev":1,"ino":2}}'] })).toBe(false);
+
+    const monitor = {
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      command: 'monitor codex-sessions',
+      status: 'partial',
+      currentBytes: 0,
+      thresholdBytes: 1,
+      growthThresholdBytes: 1,
+      alert: false,
+      statePersisted: false,
+      notificationAttempted: false,
+      warnings: ['session-root-untrusted']
+    };
+    const validateMonitor = await validatorFor('schemas/codex-session-monitor-result.v1.schema.json');
+    expect(validateMonitor({ ...monitor, toolVersion: 'private session contents' })).toBe(false);
+    expect(validateMonitor({ ...monitor, toolVersion: '1.2.3-01' })).toBe(false);
+    expect(validateMonitor({ ...monitor, warnings: [privatePath('private.jsonl')] })).toBe(false);
+  });
 });
 
 async function validatorFor(schemaPath: string) {

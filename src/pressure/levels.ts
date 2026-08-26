@@ -11,3 +11,12 @@ export function cpuLevelForCapacityPercent(cpuCapacityPercent: number): Pressure
   if (cpuCapacityPercent >= 25) return 'medium';
   return 'ok';
 }
+
+export function diskLevelForCapacityPercent(
+  capacityPercent: number | undefined
+): PressureLevel | 'unknown' {
+  if (capacityPercent === undefined) return 'unknown';
+  if (capacityPercent >= 90) return 'high';
+  if (capacityPercent >= 80) return 'medium';
+  return 'ok';
+}

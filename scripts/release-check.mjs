@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { findRuntimeNetworkPolicyViolations } from './release-network-check.mjs';
 
 const execFileAsync = promisify(execFile);
 const args = new Set(process.argv.slice(2));
@@ -198,11 +199,11 @@ function assertPackageInvariants(packageJson) {
 
 async function assertNoRuntimeNetworkImports() {
   const files = await listSourceFiles('src');
-  const blocked = /\b(?:fetch\s*\(|node:https|node:http|node:net|node:dns|node:tls|https:\/\/|http:\/\/)/;
-  for (const file of files) {
-    const source = await readFile(file, 'utf8');
-    if (blocked.test(source)) failures.push(`runtime network primitive detected in ${file}`);
-  }
+  const sources = await Promise.all(files.map(async (file) => ({
+    path: file,
+    source: await readFile(file, 'utf8')
+  })));
+  failures.push(...findRuntimeNetworkPolicyViolations(sources));
 }
 
 async function listSourceFiles(root, prefix = '') {

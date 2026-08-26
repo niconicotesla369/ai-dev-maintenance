@@ -9,15 +9,42 @@ import {
   applyMaintenancePlan as defaultApplyMaintenancePlan,
   createMaintenancePlan as defaultCreateMaintenancePlan,
   renderApplyResult,
-  renderPlanSummary
+  renderPlanSummary,
+  type ApplyPlanResult,
+  type MaintenancePlanAction,
+  type MaintenancePlanActionOptions,
+  type MaintenancePlanSummary
 } from './plan.js';
+import {
+  scanCodexSessionImages as defaultScanCodexSessionImages,
+  publicCodexSessionImageScanResult,
+  type PublicCodexSessionImageScanResult
+} from './reclaim/codex-session-images.js';
+import {
+  inspectCodexNativeCompression as defaultInspectCodexNativeCompression,
+  type CodexNativeCompressionStatus
+} from './reclaim/codex-native.js';
+import {
+  measureCodexSessionState as defaultMeasureCodexSessionState,
+  type CodexSessionMonitorResult
+} from './monitor/codex-sessions.js';
+import {
+  sendCodexSessionMonitorNotification as defaultSendCodexSessionMonitorNotification
+} from './monitor/launchd.js';
 import { runMcpSession, serveMcpStream } from './mcp/server.js';
 import { appDataHome, redactPath } from './paths.js';
 import { latestReport as defaultLatestReport, sanitizeReportForOutput } from './reports.js';
 import { validateRestoreBackup as defaultValidateRestoreBackup } from './restore.js';
 import type { MaintenanceReport } from './types.js';
 import { bannerText, shouldShowBanner } from './cli-banner.js';
-import { invalidWaitTimeoutError, parseCliArgs, unknownFlagError, usageText } from './cli-args.js';
+import {
+  invalidWaitTimeoutError,
+  parseCliArgs,
+  positionalArgsExcludingFlagValues,
+  readIntegerFlag,
+  unknownFlagError,
+  usageText
+} from './cli-args.js';
 import type { CliIo } from './cli-io.js';
 import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
@@ -27,7 +54,43 @@ import { renderPressureShareCard, renderShareCard } from './share-card.js';
 import { shouldPrettyPrint } from './ui/components.js';
 import { TOOL_VERSION } from './version.js';
 import { pruneBackups as defaultPruneBackups, pruneReports as defaultPruneReports } from './retention.js';
+import { buildVisualReportModel } from './visual-report/model.js';
+import {
+  openVisualReport as defaultOpenVisualReport,
+  type VisualReportCloseReason
+} from './visual-report/server.js';
 import path from 'node:path';
+
+const MIB = 1024 ** 2;
+const GIB = 1024 ** 3;
+const DEFAULT_IMAGE_OLDER_THAN_DAYS = 30;
+const DEFAULT_IMAGE_MIN_FILE_SIZE_MIB = 50;
+const DEFAULT_MONITOR_THRESHOLD_GIB = 8;
+const DEFAULT_MONITOR_GROWTH_GIB = 5;
+const MAX_IMAGE_OLDER_THAN_DAYS = 3650;
+const MAX_IMAGE_MIN_FILE_SIZE_MIB = 1_048_576;
+const MAX_MONITOR_THRESHOLD_GIB = 1024;
+const MAX_MONITOR_THRESHOLD_BYTES = MAX_MONITOR_THRESHOLD_GIB * GIB;
+const IMAGE_VALUE_FLAGS = new Set(['--older-than-days', '--min-file-size-mb']);
+const MONITOR_PLAN_VALUE_FLAGS = new Set(['--threshold-gib', '--growth-gib']);
+const SCHEDULED_MONITOR_VALUE_FLAGS = new Set([
+  '--threshold-bytes',
+  '--growth-threshold-bytes'
+]);
+const PUBLIC_PLAN_ACTIONS = new Set<MaintenancePlanAction>([
+  'codex-fix',
+  'cursor-clean',
+  'codex-sparkle-clean',
+  'codex-session-image-prune',
+  'codex-session-monitor-install',
+  'codex-session-monitor-remove'
+]);
+const HTML_INCOMPATIBILITY = '--html cannot be combined with --json, --share, --show-paths, --plain, or --no-banner.\n';
+const GRACEFUL_VISUAL_CLOSE_REASONS = new Set<VisualReportCloseReason>([
+  'page-close',
+  'idle-timeout',
+  'hard-timeout'
+]);
 
 export type CliResult = {
   exitCode: number;
@@ -54,6 +117,11 @@ export type CliCommands = {
   runPressureDoctor: typeof defaultRunPressureDoctor;
   runHistory: typeof defaultBuildHistoryReport;
   runTrust: typeof defaultRunTrust;
+  scanCodexSessionImages: typeof defaultScanCodexSessionImages;
+  inspectCodexNativeCompression: typeof defaultInspectCodexNativeCompression;
+  measureCodexSessionState: typeof defaultMeasureCodexSessionState;
+  sendCodexSessionMonitorNotification: typeof defaultSendCodexSessionMonitorNotification;
+  openVisualReport: typeof defaultOpenVisualReport;
   createPlan: typeof defaultCreateMaintenancePlan;
   applyPlan: typeof defaultApplyMaintenancePlan;
 };
@@ -71,6 +139,10 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   if (isRootHelpRequest(argv)) return { exitCode: 0, output: usageText() };
 
   const parsed = parseCliArgs(argv);
+  if (parsed.command === 'doctor' || parsed.command === 'report') {
+    const incompatibilityError = htmlIncompatibilityError(parsed);
+    if (incompatibilityError) return { exitCode: 2, output: incompatibilityError };
+  }
   const commands: CliCommands = {
     runDoctor: defaultRunDoctor,
     runFixSafe: defaultRunFixSafe,
@@ -82,6 +154,11 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     runPressureDoctor: defaultRunPressureDoctor,
     runHistory: defaultBuildHistoryReport,
     runTrust: defaultRunTrust,
+    scanCodexSessionImages: defaultScanCodexSessionImages,
+    inspectCodexNativeCompression: defaultInspectCodexNativeCompression,
+    measureCodexSessionState: defaultMeasureCodexSessionState,
+    sendCodexSessionMonitorNotification: defaultSendCodexSessionMonitorNotification,
+    openVisualReport: defaultOpenVisualReport,
     createPlan: defaultCreateMaintenancePlan,
     applyPlan: defaultApplyMaintenancePlan,
     ...runtime.commands
@@ -143,7 +220,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   if (parsed.command === 'doctor') {
     const flagError = unknownFlagError(
       parsed.args,
-      new Set(['--json', '--show-paths', '--share', '--no-banner', '--no-interactive', '--plain', '--wait-timeout']),
+      new Set(['--json', '--show-paths', '--share', '--html', '--no-banner', '--no-interactive', '--plain', '--wait-timeout']),
       'doctor'
     );
     if (flagError) return { exitCode: 2, output: flagError };
@@ -154,6 +231,13 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
       persistReport: parsed.share ? false : undefined
     });
     const outputReport = sanitizeReportForOutput(report);
+    if (parsed.html) {
+      return await openVisualReportForCli(
+        commands.openVisualReport,
+        buildVisualReportModel(outputReport),
+        report.status === 'unsupported' ? 2 : 0
+      );
+    }
     if (parsed.share) {
       return {
         exitCode: report.status === 'unsupported' ? 2 : 0,
@@ -247,30 +331,190 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     };
   }
 
-  if (parsed.command === 'plan') {
-    const flagError = unknownFlagError(parsed.args, new Set(['--json']), 'plan');
-    if (flagError) return { exitCode: 2, output: flagError };
-    const action = parsed.args.find((arg) => !arg.startsWith('-'));
-    if (action !== 'codex-fix' && action !== 'cursor-clean') {
-      return { exitCode: 2, output: `Unknown plan action: ${action ?? '<missing>'}\n${usageText()}` };
+  if (parsed.command === 'reclaim') {
+    if (parsed.args[0] === 'scan' && parsed.args[1] === 'codex-session-images') {
+      const imageOptions = readImageCliOptions(parsed.args);
+      if ('error' in imageOptions) return { exitCode: 2, output: imageOptions.error };
+      const flagError = unknownFlagError(
+        parsed.args.slice(2),
+        new Set(['--older-than-days', '--min-file-size-mb', '--json']),
+        'reclaim scan codex-session-images'
+      );
+      if (flagError) return { exitCode: 2, output: flagError };
+      const positionalError = exactPositionalsError(
+        parsed.args,
+        IMAGE_VALUE_FLAGS,
+        ['scan', 'codex-session-images'],
+        'reclaim scan codex-session-images'
+      );
+      if (positionalError) return { exitCode: 2, output: positionalError };
+
+      const scan = await commands.scanCodexSessionImages({
+        env,
+        olderThanDays: imageOptions.olderThanDays,
+        minFileSizeBytes: imageOptions.minFileSizeBytes
+      });
+      const output = publicCodexSessionImageScanResult(scan, imageOptions);
+      return {
+        exitCode: diagnosticExitCode(output.status),
+        output: parsed.json ? jsonOutput(output) : renderSessionImageScan(output)
+      };
     }
-    const summary = await commands.createPlan({ action, env });
+
+    if (parsed.args[0] === 'status' && parsed.args[1] === 'codex-native-compression') {
+      const flagError = unknownFlagError(
+        parsed.args.slice(2),
+        new Set(['--json']),
+        'reclaim status codex-native-compression'
+      );
+      if (flagError) return { exitCode: 2, output: flagError };
+      const positionalError = exactPositionalsError(
+        parsed.args,
+        new Set(),
+        ['status', 'codex-native-compression'],
+        'reclaim status codex-native-compression'
+      );
+      if (positionalError) return { exitCode: 2, output: positionalError };
+
+      const status = await commands.inspectCodexNativeCompression({ env });
+      return {
+        exitCode: diagnosticExitCode(status.status),
+        output: parsed.json ? jsonOutput(status) : renderNativeCompressionStatus(status)
+      };
+    }
+
+    return {
+      exitCode: 2,
+      output: `Unknown reclaim command: ${parsed.args.filter((arg) => !arg.startsWith('-')).join(' ') || '<missing>'}\n${usageText()}`
+    };
+  }
+
+  if (parsed.command === 'monitor') {
+    if (parsed.args[0] !== 'codex-sessions') {
+      return {
+        exitCode: 2,
+        output: `Unknown monitor action: ${parsed.args[0] ?? '<missing>'}\n${usageText()}`
+      };
+    }
+    const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--json']), 'monitor codex-sessions');
+    if (flagError) return { exitCode: 2, output: flagError };
+    const positionalError = exactPositionalsError(
+      parsed.args,
+      new Set(),
+      ['codex-sessions'],
+      'monitor codex-sessions'
+    );
+    if (positionalError) return { exitCode: 2, output: positionalError };
+
+    const result = await commands.measureCodexSessionState({
+      env,
+      persistState: false,
+      notify: false
+    });
+    return {
+      exitCode: diagnosticExitCode(result.status),
+      output: parsed.json ? jsonOutput(result) : renderSessionMonitorResult(result)
+    };
+  }
+
+  if (parsed.command === '__scheduled-monitor') {
+    if (parsed.args[0] !== 'codex-sessions') {
+      return { exitCode: 2, output: 'Unknown scheduled monitor action.\n' };
+    }
+    const thresholds = readScheduledMonitorCliOptions(parsed.args);
+    if ('error' in thresholds) return { exitCode: 2, output: thresholds.error };
+    const flagError = unknownFlagError(
+      parsed.args.slice(1),
+      SCHEDULED_MONITOR_VALUE_FLAGS,
+      '__scheduled-monitor codex-sessions'
+    );
+    if (flagError) return { exitCode: 2, output: flagError };
+    const positionalError = exactPositionalsError(
+      parsed.args,
+      SCHEDULED_MONITOR_VALUE_FLAGS,
+      ['codex-sessions'],
+      '__scheduled-monitor codex-sessions'
+    );
+    if (positionalError) return { exitCode: 2, output: positionalError };
+
+    const result = await commands.measureCodexSessionState({
+      env,
+      thresholdBytes: thresholds.thresholdBytes,
+      growthThresholdBytes: thresholds.growthThresholdBytes,
+      persistState: true,
+      notify: true,
+      notificationSender: async (notification) => commands.sendCodexSessionMonitorNotification(
+        notification,
+        { env }
+      )
+    });
+    return {
+      exitCode: diagnosticExitCode(result.status),
+      output: jsonOutput(result)
+    };
+  }
+
+  if (parsed.command === 'plan') {
+    const positionals = positionalArgsExcludingFlagValues(
+      parsed.args,
+      new Set([...IMAGE_VALUE_FLAGS, ...MONITOR_PLAN_VALUE_FLAGS])
+    );
+    const action = positionals[0];
+    if (positionals.length !== 1 || !isPublicPlanAction(action)) {
+      return {
+        exitCode: 2,
+        output: `Unknown plan action: ${positionals.join(' ') || '<missing>'}\n${usageText()}`
+      };
+    }
+
+    let actionOptions: MaintenancePlanActionOptions | undefined;
+    let allowedFlags = new Set(['--json']);
+    if (action === 'codex-session-image-prune') {
+      const imageOptions = readImageCliOptions(parsed.args);
+      if ('error' in imageOptions) return { exitCode: 2, output: imageOptions.error };
+      actionOptions = imageOptions;
+      allowedFlags = new Set(['--older-than-days', '--min-file-size-mb', '--json']);
+    } else if (action === 'codex-session-monitor-install') {
+      const monitorOptions = readMonitorPlanCliOptions(parsed.args);
+      if ('error' in monitorOptions) return { exitCode: 2, output: monitorOptions.error };
+      actionOptions = monitorOptions;
+      allowedFlags = new Set(['--threshold-gib', '--growth-gib', '--json']);
+    }
+    const flagError = unknownFlagError(parsed.args, allowedFlags, 'plan');
+    if (flagError) return { exitCode: 2, output: flagError };
+
+    const summary = await commands.createPlan(actionOptions
+      ? { action, actionOptions, env }
+      : { action, env });
     return {
       exitCode: summary.status === 'ready' ? 0 : 3,
-      output: parsed.json ? jsonOutput(summary) : renderPlanSummary(summary)
+      output: parsed.json ? jsonOutput(summary) : renderCliPlanSummary(summary)
     };
   }
 
   if (parsed.command === 'apply') {
-    const flagError = unknownFlagError(parsed.args, new Set(['--plan', '--yes', '--json']), 'apply');
+    const flagError = unknownFlagError(
+      parsed.args,
+      new Set(['--plan', '--yes', '--accept-image-loss', '--json']),
+      'apply'
+    );
     if (flagError) return { exitCode: 2, output: flagError };
     if (!parsed.args.includes('--yes')) return { exitCode: 2, output: 'Missing required confirmation: --yes\n' };
-    const plan = parsed.args[parsed.args.indexOf('--plan') + 1];
+    const planFlagCount = parsed.args.filter((arg) => arg === '--plan').length;
+    if (planFlagCount > 1) return { exitCode: 2, output: `Duplicate --plan.\n${usageText()}` };
+    const planIndex = parsed.args.indexOf('--plan');
+    const plan = planIndex === -1 ? undefined : parsed.args[planIndex + 1];
     if (!plan || plan.startsWith('-')) return { exitCode: 2, output: `Missing --plan <planId>.\n${usageText()}` };
-    const result = await commands.applyPlan({ planId: plan, env });
+    const positionalError = exactPositionalsError(parsed.args, new Set(['--plan']), [], 'apply');
+    if (positionalError) return { exitCode: 2, output: positionalError };
+    const result = await commands.applyPlan({
+      planId: plan,
+      env,
+      confirmations: { imageLoss: parsed.args.includes('--accept-image-loss') }
+    });
     return {
       exitCode: result.status === 'ok' ? 0 : 3,
-      output: parsed.json ? jsonOutput(result) : renderApplyResult(result)
+      output: parsed.json ? jsonOutput(result) : renderCliApplyResult(result)
     };
   }
 
@@ -316,7 +560,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
   }
 
   if (parsed.command === 'report' && parsed.args.includes('--latest')) {
-    const flagError = unknownFlagError(parsed.args, new Set(['--latest', '--show-paths', '--json', '--unredacted']), 'report');
+    const flagError = unknownFlagError(parsed.args, new Set(['--latest', '--show-paths', '--json', '--html', '--unredacted']), 'report');
     if (flagError) return { exitCode: 2, output: flagError };
     if (parsed.args.includes('--unredacted')) {
       return { exitCode: 2, output: '--unredacted is not supported in v1.\n' };
@@ -325,6 +569,13 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     if (!latest) return { exitCode: 1, output: 'No report found.\n' };
     const includePath = parsed.args.includes('--show-paths');
     const payload = sanitizeReportForOutput(latest.report);
+    if (parsed.html) {
+      return await openVisualReportForCli(
+        commands.openVisualReport,
+        buildVisualReportModel(payload),
+        0
+      );
+    }
     if (parsed.json) {
       return {
         exitCode: 0,
@@ -373,6 +624,267 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     exitCode: 2,
     output: usageText()
   };
+}
+
+type HtmlCliFlags = {
+  html: boolean;
+  json: boolean;
+  share: boolean;
+  showPaths: boolean;
+  plain: boolean;
+  noBanner: boolean;
+};
+
+function htmlIncompatibilityError(flags: HtmlCliFlags): string | undefined {
+  if (
+    flags.html
+    && (flags.json || flags.share || flags.showPaths || flags.plain || flags.noBanner)
+  ) {
+    return HTML_INCOMPATIBILITY;
+  }
+  return undefined;
+}
+
+async function openVisualReportForCli(
+  openReport: typeof defaultOpenVisualReport,
+  model: Parameters<typeof defaultOpenVisualReport>[0],
+  underlyingExitCode: number
+): Promise<CliResult> {
+  let reason: VisualReportCloseReason;
+  try {
+    reason = await openReport(model);
+  } catch {
+    return visualReportFailureResult();
+  }
+
+  if (GRACEFUL_VISUAL_CLOSE_REASONS.has(reason)) {
+    return {
+      exitCode: underlyingExitCode,
+      output: 'Visual report closed. No HTML file was saved.\n'
+    };
+  }
+  if (reason === 'signal') {
+    return {
+      exitCode: 130,
+      output: 'Visual report interrupted. No HTML file was saved.\n'
+    };
+  }
+  return visualReportFailureResult();
+}
+
+function visualReportFailureResult(): CliResult {
+  return {
+    exitCode: 3,
+    output: 'Visual report could not be opened safely. No HTML file was saved.\n'
+  };
+}
+
+type ImageCliOptions = {
+  olderThanDays: number;
+  minFileSizeBytes: number;
+};
+
+type MonitorPlanCliOptions = {
+  thresholdBytes: number;
+  growthThresholdBytes: number;
+};
+
+function readImageCliOptions(args: string[]): ImageCliOptions | { error: string } {
+  const olderThanDays = readIntegerFlag(args, {
+    flag: '--older-than-days',
+    min: 1,
+    max: MAX_IMAGE_OLDER_THAN_DAYS
+  });
+  if (olderThanDays.error) return { error: olderThanDays.error };
+  const minFileSizeMib = readIntegerFlag(args, {
+    flag: '--min-file-size-mb',
+    min: 1,
+    max: MAX_IMAGE_MIN_FILE_SIZE_MIB
+  });
+  if (minFileSizeMib.error) return { error: minFileSizeMib.error };
+  return {
+    olderThanDays: olderThanDays.value ?? DEFAULT_IMAGE_OLDER_THAN_DAYS,
+    minFileSizeBytes: (minFileSizeMib.value ?? DEFAULT_IMAGE_MIN_FILE_SIZE_MIB) * MIB
+  };
+}
+
+function readMonitorPlanCliOptions(
+  args: string[]
+): MonitorPlanCliOptions | { error: string } {
+  const thresholdGib = readIntegerFlag(args, {
+    flag: '--threshold-gib',
+    min: 1,
+    max: MAX_MONITOR_THRESHOLD_GIB
+  });
+  if (thresholdGib.error) return { error: thresholdGib.error };
+  const growthGib = readIntegerFlag(args, {
+    flag: '--growth-gib',
+    min: 1,
+    max: MAX_MONITOR_THRESHOLD_GIB
+  });
+  if (growthGib.error) return { error: growthGib.error };
+  return {
+    thresholdBytes: (thresholdGib.value ?? DEFAULT_MONITOR_THRESHOLD_GIB) * GIB,
+    growthThresholdBytes: (growthGib.value ?? DEFAULT_MONITOR_GROWTH_GIB) * GIB
+  };
+}
+
+function readScheduledMonitorCliOptions(
+  args: string[]
+): MonitorPlanCliOptions | { error: string } {
+  const thresholdBytes = readIntegerFlag(args, {
+    flag: '--threshold-bytes',
+    min: 1,
+    max: MAX_MONITOR_THRESHOLD_BYTES,
+    required: true
+  });
+  if (thresholdBytes.error) return { error: thresholdBytes.error };
+  const growthThresholdBytes = readIntegerFlag(args, {
+    flag: '--growth-threshold-bytes',
+    min: 1,
+    max: MAX_MONITOR_THRESHOLD_BYTES,
+    required: true
+  });
+  if (growthThresholdBytes.error) return { error: growthThresholdBytes.error };
+  return {
+    thresholdBytes: thresholdBytes.value as number,
+    growthThresholdBytes: growthThresholdBytes.value as number
+  };
+}
+
+function exactPositionalsError(
+  args: string[],
+  valueFlags: ReadonlySet<string>,
+  expected: string[],
+  command: string
+): string | undefined {
+  const actual = positionalArgsExcludingFlagValues(args, valueFlags);
+  if (
+    actual.length === expected.length
+    && actual.every((value, index) => value === expected[index])
+  ) {
+    return undefined;
+  }
+  return `Unexpected ${command} positional argument.\n${usageText()}`;
+}
+
+function isPublicPlanAction(value: string | undefined): value is MaintenancePlanAction {
+  return value !== undefined && PUBLIC_PLAN_ACTIONS.has(value as MaintenancePlanAction);
+}
+
+function diagnosticExitCode(status: string): number {
+  return status === 'ok' ? 0 : 3;
+}
+
+function renderSessionImageScan(result: PublicCodexSessionImageScanResult): string {
+  const lines = [
+    row(
+      'Content access',
+      'Reads candidate Codex session JSONL contents locally; no session content is printed or uploaded.'
+    ),
+    row('Image scan', result.status),
+    row('Content read', 'yes'),
+    row('Candidate files', String(result.totals.candidateFiles)),
+    row('Files opened', String(result.totals.filesOpened)),
+    row('Files blocked', String(result.totals.filesBlocked)),
+    row('Images', String(result.totals.imagesPrunable)),
+    row('Source size', formatBytes(result.totals.sourceBytes)),
+    row('Projected size', formatBytes(result.totals.projectedBytes)),
+    row('Reclaimable', formatBytes(result.totals.reclaimableBytes)),
+    row('Changed', 'nothing; estimate only')
+  ];
+  for (const reason of result.blockedReasons) lines.push(row('Reason', reason));
+  for (const warning of result.warnings) lines.push(row('Warning', warning));
+  return `${lines.join('\n')}\n`;
+}
+
+function renderNativeCompressionStatus(result: CodexNativeCompressionStatus): string {
+  const lines = [
+    row('Native status', result.status),
+    row('Supported', result.supported ? 'yes' : 'no'),
+    row('Configured', result.configuredState),
+    row('Plain JSONL', String(result.plainJsonlFiles)),
+    row('Compressed JSONL', String(result.compressedJsonlFiles)),
+    row('Changed', 'nothing; advisory only')
+  ];
+  if (result.featureStage !== undefined) lines.push(row('Feature stage', result.featureStage));
+  if (result.defaultEnabled !== undefined) {
+    lines.push(row('Default enabled', result.defaultEnabled ? 'yes' : 'no'));
+  }
+  for (const warning of result.warnings) lines.push(row('Warning', redactPath(warning)));
+  for (const next of result.nextActions) lines.push(row('Next', redactPath(next)));
+  return `${lines.join('\n')}\n`;
+}
+
+function renderSessionMonitorResult(result: CodexSessionMonitorResult): string {
+  const lines = [
+    row('Session monitor', result.status),
+    row('Current', formatBytes(result.currentBytes)),
+    row('Threshold', formatBytes(result.thresholdBytes)),
+    row('Growth threshold', formatBytes(result.growthThresholdBytes)),
+    row('Alert', result.alert ? 'yes' : 'no'),
+    row('State persisted', result.statePersisted ? 'yes' : 'no; manual mode does not persist'),
+    row('Notification', result.notificationAttempted ? (result.notificationDelivered ? 'delivered' : 'not delivered') : 'not attempted'),
+    row('Changed', 'no session content; metadata measurement only')
+  ];
+  if (result.previousBytes !== undefined) lines.push(row('Previous', formatBytes(result.previousBytes)));
+  if (result.deltaBytes !== undefined) lines.push(row('Growth', formatSignedBytes(result.deltaBytes)));
+  for (const warning of result.warnings) lines.push(row('Warning', redactPath(warning)));
+  return `${lines.join('\n')}\n`;
+}
+
+function renderCliPlanSummary(summary: MaintenancePlanSummary): string {
+  if (summary.action !== 'codex-session-image-prune') return renderPlanSummary(summary);
+  const lines = renderPlanSummary(summary).trimEnd().split('\n');
+  const nextIndex = lines.findIndex((line) => line.startsWith('Next'));
+  const consent = row(
+    'Consent',
+    'Irreversible image loss; apply requires both --yes and --accept-image-loss.'
+  );
+  lines.splice(nextIndex === -1 ? lines.length : nextIndex, 0, consent);
+  return `${lines.join('\n')}\n`;
+}
+
+function renderCliApplyResult(result: ApplyPlanResult): string {
+  if (
+    result.action !== 'codex-session-image-prune'
+    && result.action !== 'codex-sparkle-clean'
+  ) {
+    return renderApplyResult(result);
+  }
+  const lines = renderApplyResult(result).trimEnd().split('\n');
+  const details = isPlainObject(result.result) ? result.result : undefined;
+  if (!details) return `${lines.join('\n')}\n`;
+
+  const reclaimed = result.action === 'codex-session-image-prune'
+    ? safeIntegerField(details, 'reclaimedBytes')
+    : safeIntegerField(details, 'deletedBytes');
+  if (reclaimed !== undefined && reclaimed >= 0) {
+    lines.push(row('Reclaimed', formatBytes(reclaimed)));
+  }
+  const freeDelta = safeIntegerField(details, 'volumeFreeDeltaBytes');
+  if (freeDelta !== undefined) {
+    lines.push(row('Free-space delta', formatSignedBytes(freeDelta)));
+  }
+  const changedCount = result.action === 'codex-session-image-prune'
+    ? safeIntegerField(details, 'imagesStripped')
+    : safeIntegerField(details, 'deletedEntries');
+  if (changedCount !== undefined && changedCount >= 0) {
+    lines.push(row(
+      result.action === 'codex-session-image-prune' ? 'Images removed' : 'Entries removed',
+      String(changedCount)
+    ));
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function safeIntegerField(value: Record<string, unknown>, key: string): number | undefined {
+  const candidate = value[key];
+  return Number.isSafeInteger(candidate) ? candidate as number : undefined;
+}
+
+function formatSignedBytes(bytes: number): string {
+  return bytes < 0 ? `-${formatBytes(Math.abs(bytes))}` : formatBytes(bytes);
 }
 
 function isRootVersionRequest(argv: string[]): boolean {

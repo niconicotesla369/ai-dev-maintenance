@@ -1,7 +1,17 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 import { runCli } from '../src/cli.js';
 import { TOOL_VERSION } from '../src/version.js';
 import type { CliRuntimeOptions } from '../src/cli-router.js';
+
+const RELEASE_VERSION = '0.6.0';
+
+function readmePackageCommandLines(readme: string): string[] {
+  return readme
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => /^(?:npx\b|npm exec\b|npm install -g\b)/.test(line) && line.includes('ai-dev-maintenance'));
+}
 
 describe('root version CLI', () => {
   test.each([
@@ -32,6 +42,37 @@ describe('root version CLI', () => {
 
     expect(result.exitCode).toBe(2);
     expect(result.output).toContain('Unknown pressure flag: --version');
+  });
+});
+
+describe('v0.6.0 release metadata', () => {
+  test('CLI and machine-readable metadata agree on the release version', async () => {
+    const cliResult = await runCli(['--version'], runtimeThatMustNotRunCommands([]));
+    const packageMetadata = JSON.parse(await readFile('package.json', 'utf8')) as { version?: unknown };
+    const sampleReport = JSON.parse(await readFile('examples/sample-report.json', 'utf8')) as {
+      toolVersion?: unknown;
+    };
+
+    expect(cliResult.output).toBe(`${RELEASE_VERSION}\n`);
+    expect(TOOL_VERSION).toBe(RELEASE_VERSION);
+    expect(packageMetadata.version).toBe(RELEASE_VERSION);
+    expect(sampleReport.toolVersion).toBe(RELEASE_VERSION);
+  });
+
+  test('README package-command selection includes an unpinned invocation', () => {
+    expect(readmePackageCommandLines('npx --yes ai-dev-maintenance')).toEqual([
+      'npx --yes ai-dev-maintenance'
+    ]);
+  });
+
+  test.each(['README.md', 'README.ja.md'])('%s pins every current package command to the release version', async (file) => {
+    const readme = await readFile(file, 'utf8');
+    const packageCommands = readmePackageCommandLines(readme);
+
+    expect(packageCommands.length).toBeGreaterThan(0);
+    for (const command of packageCommands) {
+      expect(command).toContain(`ai-dev-maintenance@${RELEASE_VERSION}`);
+    }
   });
 });
 

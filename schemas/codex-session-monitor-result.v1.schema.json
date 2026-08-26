@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/codex-session-monitor-result.v1.schema.json",
+  "title": "AIDM Codex Session Monitor Result v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "command",
+    "status",
+    "currentBytes",
+    "thresholdBytes",
+    "growthThresholdBytes",
+    "alert",
+    "statePersisted",
+    "notificationAttempted",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "toolVersion": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "command": { "const": "monitor codex-sessions" },
+    "status": { "enum": ["ok", "partial", "blocked"] },
+    "currentBytes": { "$ref": "#/definitions/nonNegativeInteger" },
+    "previousBytes": { "$ref": "#/definitions/nonNegativeInteger" },
+    "deltaBytes": { "$ref": "#/definitions/safeInteger" },
+    "thresholdBytes": { "$ref": "#/definitions/positiveInteger" },
+    "growthThresholdBytes": { "$ref": "#/definitions/positiveInteger" },
+    "alert": { "type": "boolean" },
+    "statePersisted": { "type": "boolean" },
+    "notificationAttempted": { "type": "boolean" },
+    "notificationDelivered": { "type": "boolean" },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "invalid-monitor-thresholds",
+          "custom-codex-home-unsupported",
+          "session-root-untrusted",
+          "monitor-state-untrusted",
+          "monitor-state-invalid",
+          "volume-metadata-unavailable",
+          "session-metadata-scan-incomplete",
+          "session-byte-count-invalid",
+          "monitor-state-persist-failed",
+          "monitor-state-not-updated",
+          "notification-failed",
+          "monitor-report-persist-failed"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "positiveInteger": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1099511627776
+    },
+    "safeInteger": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    }
+  }
+}

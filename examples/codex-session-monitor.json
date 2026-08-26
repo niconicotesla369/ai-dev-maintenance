@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.6.0",
+  "command": "monitor codex-sessions",
+  "status": "ok",
+  "currentBytes": 10737418240,
+  "previousBytes": 4294967296,
+  "deltaBytes": 6442450944,
+  "thresholdBytes": 8589934592,
+  "growthThresholdBytes": 5368709120,
+  "alert": true,
+  "statePersisted": false,
+  "notificationAttempted": false,
+  "warnings": []
+}

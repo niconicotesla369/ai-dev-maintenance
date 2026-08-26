@@ -4,6 +4,9 @@ import { describe, expect, test } from 'vitest';
 import { runCli } from '../src/cli.js';
 import type { PressureReport } from '../src/pressure/types.js';
 import type { MaintenanceReport } from '../src/types.js';
+import { TOOL_VERSION } from '../src/version.js';
+
+const RECORDED_PACKAGE_VERSION_TOKEN = 'ai-dev-maintenance@0.5.0';
 
 describe('wire compatibility snapshots', () => {
   test('keeps doctor --json wire output stable', async () => {
@@ -42,7 +45,7 @@ describe('wire compatibility snapshots', () => {
     });
 
     expect(result.exitCode).toBe(0);
-    await expectWireOutput('fix-success.txt', result.output);
+    await expectHumanWireOutput('fix-success.txt', result.output);
   });
 
   test('keeps fix blocked human output stable', async () => {
@@ -56,7 +59,7 @@ describe('wire compatibility snapshots', () => {
     });
 
     expect(result.exitCode).toBe(3);
-    await expectWireOutput('fix-blocked.txt', result.output);
+    await expectHumanWireOutput('fix-blocked.txt', result.output);
   });
 
   test('keeps report --latest human output stable', async () => {
@@ -70,12 +73,29 @@ describe('wire compatibility snapshots', () => {
     });
 
     expect(result.exitCode).toBe(0);
-    await expectWireOutput('report-latest.txt', result.output);
+    await expectHumanWireOutput('report-latest.txt', result.output);
   });
 });
 
 async function expectWireOutput(fixtureName: string, actual: string): Promise<void> {
   const expected = await readFile(path.join('test/fixtures/wire', fixtureName), 'utf8');
+  expect(actual).toBe(expected);
+}
+
+async function expectHumanWireOutput(fixtureName: string, actual: string): Promise<void> {
+  const recorded = await readFile(path.join('test/fixtures/wire', fixtureName), 'utf8');
+  const firstTokenIndex = recorded.indexOf(RECORDED_PACKAGE_VERSION_TOKEN);
+  if (
+    firstTokenIndex === -1
+    || firstTokenIndex !== recorded.lastIndexOf(RECORDED_PACKAGE_VERSION_TOKEN)
+  ) {
+    throw new Error('Expected exactly one recorded package-version token');
+  }
+  const expected = [
+    recorded.slice(0, firstTokenIndex),
+    `ai-dev-maintenance@${TOOL_VERSION}`,
+    recorded.slice(firstTokenIndex + RECORDED_PACKAGE_VERSION_TOKEN.length)
+  ].join('');
   expect(actual).toBe(expected);
 }
 

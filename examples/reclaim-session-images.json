@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.6.0",
+  "command": "reclaim scan codex-session-images",
+  "status": "ok",
+  "contentRead": true,
+  "filters": {
+    "olderThanDays": 30,
+    "minFileSizeBytes": 52428800
+  },
+  "totals": {
+    "filesConsidered": 3,
+    "filesOpened": 2,
+    "filesSkippedBySize": 1,
+    "filesSkippedAfterRead": 0,
+    "filesBlocked": 0,
+    "sourceBytes": 104857600,
+    "projectedBytes": 20971520,
+    "reclaimableBytes": 83886080,
+    "occurrencesSeen": 4,
+    "imagesPrunable": 3,
+    "knownPlaceholders": 1,
+    "belowMinimum": 0,
+    "candidateFiles": 2
+  },
+  "blockedReasons": [],
+  "warnings": [
+    "size-filtered-estimate-is-lower-bound"
+  ]
+}

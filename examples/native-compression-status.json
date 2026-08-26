@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.6.0",
+  "command": "reclaim status codex-native-compression",
+  "status": "ok",
+  "supported": true,
+  "featureStage": "stable",
+  "defaultEnabled": false,
+  "configuredState": "unknown",
+  "plainJsonlFiles": 4,
+  "compressedJsonlFiles": 1,
+  "warnings": [],
+  "nextActions": [
+    "Prune eligible session images before enabling native compression.",
+    "Use the official Codex CLI to manage this feature; AIDM will not edit configuration."
+  ]
+}

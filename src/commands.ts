@@ -7,11 +7,57 @@ import type { CommandRunResult, CommandStat } from './types.js';
 export const ALLOWED_COMMANDS = {
   sqlite3: '/usr/bin/sqlite3',
   lsof: '/usr/sbin/lsof',
+  plutil: '/usr/bin/plutil',
+  launchctl: '/bin/launchctl',
+  osascript: '/usr/bin/osascript',
+  open: '/usr/bin/open',
   ps: '/bin/ps',
   vm_stat: '/usr/bin/vm_stat',
   df: '/bin/df',
   memory_pressure: '/usr/bin/memory_pressure'
 } as const;
+
+export function batchCommandArguments(
+  fixedArguments: readonly string[],
+  values: readonly string[],
+  limits: { executable: string; maxValuesPerBatch: number; maxBytesPerBatch: number }
+): string[][] {
+  const maxValuesPerBatch = positiveSafeInteger(
+    limits.maxValuesPerBatch,
+    'maxValuesPerBatch'
+  );
+  const maxBytesPerBatch = positiveSafeInteger(
+    limits.maxBytesPerBatch,
+    'maxBytesPerBatch'
+  );
+  const fixed = [...fixedArguments];
+  const fixedBytes = argvBytes([limits.executable, ...fixed]);
+  if (fixedBytes > maxBytesPerBatch) {
+    throw new RangeError('fixed command arguments exceed the batch byte limit');
+  }
+
+  const batches: string[][] = [];
+  let batch: string[] = [];
+  let batchBytes = fixedBytes;
+  for (const value of values) {
+    const valueBytes = argvBytes([value]);
+    if (fixedBytes + valueBytes > maxBytesPerBatch) {
+      throw new RangeError('command argument exceeds the batch byte limit');
+    }
+    if (
+      batch.length >= maxValuesPerBatch
+      || batchBytes + valueBytes > maxBytesPerBatch
+    ) {
+      batches.push([...fixed, ...batch]);
+      batch = [];
+      batchBytes = fixedBytes;
+    }
+    batch.push(value);
+    batchBytes += valueBytes;
+  }
+  if (batch.length > 0) batches.push([...fixed, ...batch]);
+  return batches;
+}
 
 export function isTrustedSystemCommand(stat: CommandStat): boolean {
   const allowed = new Set<string>(Object.values(ALLOWED_COMMANDS));
@@ -133,4 +179,18 @@ export async function runCommand(
       });
     });
   });
+}
+
+function argvBytes(arguments_: readonly string[]): number {
+  return arguments_.reduce(
+    (total, argument) => total + Buffer.byteLength(argument) + 1,
+    0
+  );
+}
+
+function positiveSafeInteger(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new RangeError(`${name} must be a positive safe integer`);
+  }
+  return value;
 }

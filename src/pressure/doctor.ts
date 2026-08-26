@@ -3,7 +3,7 @@ import { runCommand as defaultRunCommand, trustedCommandPath as defaultTrustedCo
 import type { CommandRunResult } from '../types.js';
 import { TOOL_VERSION } from '../version.js';
 import { classifyPressureProcesses } from './classify.js';
-import { cpuLevelForCapacityPercent, cpuLevelForPercent } from './levels.js';
+import { cpuLevelForCapacityPercent, cpuLevelForPercent, diskLevelForCapacityPercent } from './levels.js';
 import { parseDfOutput, parseMemoryPressureOutput, parsePsOutput, parseVmStatOutput } from './parse.js';
 import type { MemoryPressureSnapshot, PressureLevel, PressureProcess, PressureReport, PressureProviderId } from './types.js';
 
@@ -225,7 +225,8 @@ function nextActions(report: PressureReport): string[] {
 function pressureLevel(report: PressureReport) {
   const cpu = cpuLevelForReportCpu(report.totals.aiCpuPercent, report.totals.aiCpuCapacityPercent);
   const memory = memoryLevel(report);
-  const disk = diskLevel(report.disk.capacityPercent);
+  const visualDiskLevel = diskLevelForCapacityPercent(report.disk.capacityPercent);
+  const disk: PressureLevel = visualDiskLevel === 'unknown' ? 'ok' : visualDiskLevel;
   const reasons: string[] = [];
   const otherCpu = cpuLevelForReportCpu(report.totals.otherCpuPercent, report.totals.otherCpuCapacityPercent);
   if (memory === 'high') reasons.push('memory pressure is high');
@@ -266,12 +267,6 @@ function excludeCurrentProcessTree(processes: PressureProcess[], currentPid: num
 function memoryLevel(report: PressureReport): PressureLevel {
   if ((report.memory.freePercent ?? 100) < 15) return 'high';
   if ((report.memory.freePercent ?? 100) < 25) return 'medium';
-  return 'ok';
-}
-
-function diskLevel(capacityPercent: number | undefined): PressureLevel {
-  if ((capacityPercent ?? 0) >= 90) return 'high';
-  if ((capacityPercent ?? 0) >= 80) return 'medium';
   return 'ok';
 }
 

@@ -38,8 +38,8 @@ describe('trust command', () => {
       summary: {
         trusted: 1,
         untrusted: 1,
-        missing: 4,
-        total: 6
+        missing: 8,
+        total: 10
       }
     });
     expect(report.entries.find((entry) => entry.name === 'sqlite3')).toMatchObject({
@@ -54,6 +54,26 @@ describe('trust command', () => {
     });
     expect(report.entries.find((entry) => entry.name === 'df')).toMatchObject({
       path: '/bin/df',
+      status: 'missing',
+      reasons: ['missing']
+    });
+    expect(report.entries.find((entry) => entry.name === 'plutil')).toMatchObject({
+      path: '/usr/bin/plutil',
+      status: 'missing',
+      reasons: ['missing']
+    });
+    expect(report.entries.find((entry) => entry.name === 'launchctl')).toMatchObject({
+      path: '/bin/launchctl',
+      status: 'missing',
+      reasons: ['missing']
+    });
+    expect(report.entries.find((entry) => entry.name === 'osascript')).toMatchObject({
+      path: '/usr/bin/osascript',
+      status: 'missing',
+      reasons: ['missing']
+    });
+    expect(report.entries.find((entry) => entry.name === 'open')).toMatchObject({
+      path: '/usr/bin/open',
       status: 'missing',
       reasons: ['missing']
     });

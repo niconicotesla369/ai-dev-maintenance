@@ -3,6 +3,24 @@ import { access, lstat, mkdir, realpath } from 'node:fs/promises';
 import path from 'node:path';
 import type { FileIdentity, TargetState } from './types.js';
 
+export type ExecutableSafetyBlocker =
+  | 'executable-path-invalid'
+  | 'executable-missing'
+  | 'executable-inspection-failed'
+  | 'executable-symlink'
+  | 'executable-not-regular'
+  | 'executable-not-canonical'
+  | 'executable-hardlinked'
+  | 'executable-owner-unsafe'
+  | 'executable-mode-unsafe'
+  | 'executable-not-executable';
+
+export type SafeExecutableInspection = {
+  safe: boolean;
+  identity?: FileIdentity;
+  blockers: ExecutableSafetyBlocker[];
+};
+
 export async function collectFileIdentity(filePath: string, pathCategory: string): Promise<FileIdentity> {
   try {
     const lst = await lstat(filePath);
@@ -34,6 +52,63 @@ export async function collectFileIdentity(filePath: string, pathCategory: string
     }
     throw error;
   }
+}
+
+export async function inspectSafeExecutable(
+  executablePath: string,
+  pathCategory: string
+): Promise<SafeExecutableInspection> {
+  if (
+    typeof executablePath !== 'string'
+    || !path.isAbsolute(executablePath)
+    || path.resolve(executablePath) !== executablePath
+  ) {
+    return { safe: false, blockers: ['executable-path-invalid'] };
+  }
+
+  let identity: FileIdentity;
+  try {
+    identity = await collectFileIdentity(executablePath, pathCategory);
+  } catch {
+    return { safe: false, blockers: ['executable-inspection-failed'] };
+  }
+
+  const blockers: ExecutableSafetyBlocker[] = [];
+  const uid = process.getuid?.();
+  if (!identity.exists) blockers.push('executable-missing');
+  if (identity.symbolicLink) blockers.push('executable-symlink');
+  if (!identity.regularFile) blockers.push('executable-not-regular');
+  if (identity.realpath !== executablePath) blockers.push('executable-not-canonical');
+  if (identity.nlink !== 1) blockers.push('executable-hardlinked');
+  if (identity.uid !== 0 && (uid === undefined || identity.uid !== uid)) {
+    blockers.push('executable-owner-unsafe');
+  }
+  if (identity.mode === undefined || (identity.mode & 0o022) !== 0) {
+    blockers.push('executable-mode-unsafe');
+  }
+  if (identity.mode === undefined || (identity.mode & 0o111) === 0) {
+    blockers.push('executable-not-executable');
+  }
+  return { safe: blockers.length === 0, identity, blockers: [...new Set(blockers)] };
+}
+
+export function sameExecutableIdentity(left: FileIdentity, right: FileIdentity): boolean {
+  const keys: Array<keyof FileIdentity> = [
+    'pathCategory',
+    'realpath',
+    'dev',
+    'ino',
+    'mode',
+    'uid',
+    'gid',
+    'size',
+    'mtimeMs',
+    'nlink',
+    'exists',
+    'regularFile',
+    'symbolicLink'
+  ];
+  return keys.every((key) => left[key] === right[key]);
 }
 
 export async function detectTargetState(mainPath: string): Promise<TargetState> {

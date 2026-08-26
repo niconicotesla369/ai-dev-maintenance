@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/reclaim-scan-result.v1.schema.json",
+  "title": "AIDM Codex Session Image Reclaim Scan Result v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "toolVersion",
+    "command",
+    "status",
+    "contentRead",
+    "filters",
+    "totals",
+    "blockedReasons",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "toolVersion": {
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    },
+    "command": { "const": "reclaim scan codex-session-images" },
+    "status": { "enum": ["ok", "partial", "blocked"] },
+    "contentRead": { "const": true },
+    "filters": {
+      "type": "object",
+      "required": ["olderThanDays", "minFileSizeBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "olderThanDays": { "$ref": "#/definitions/nonNegativeInteger" },
+        "minFileSizeBytes": { "$ref": "#/definitions/nonNegativeInteger" }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": [
+        "filesConsidered",
+        "filesOpened",
+        "filesSkippedBySize",
+        "filesSkippedAfterRead",
+        "filesBlocked",
+        "sourceBytes",
+        "projectedBytes",
+        "reclaimableBytes",
+        "occurrencesSeen",
+        "imagesPrunable",
+        "knownPlaceholders",
+        "belowMinimum",
+        "candidateFiles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "filesConsidered": { "$ref": "#/definitions/nonNegativeInteger" },
+        "filesOpened": { "$ref": "#/definitions/nonNegativeInteger" },
+        "filesSkippedBySize": { "$ref": "#/definitions/nonNegativeInteger" },
+        "filesSkippedAfterRead": { "$ref": "#/definitions/nonNegativeInteger" },
+        "filesBlocked": { "$ref": "#/definitions/nonNegativeInteger" },
+        "sourceBytes": { "$ref": "#/definitions/nonNegativeInteger" },
+        "projectedBytes": { "$ref": "#/definitions/nonNegativeInteger" },
+        "reclaimableBytes": { "$ref": "#/definitions/nonNegativeInteger" },
+        "occurrencesSeen": { "$ref": "#/definitions/nonNegativeInteger" },
+        "imagesPrunable": { "$ref": "#/definitions/nonNegativeInteger" },
+        "knownPlaceholders": { "$ref": "#/definitions/nonNegativeInteger" },
+        "belowMinimum": { "$ref": "#/definitions/nonNegativeInteger" },
+        "candidateFiles": { "$ref": "#/definitions/nonNegativeInteger" }
+      }
+    },
+    "blockedReasons": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "ambiguous-data-url",
+          "custom-codex-home-unsupported",
+          "invalid-json",
+          "invalid-utf8",
+          "line-too-large",
+          "platform-unsupported",
+          "unsafe-codex-root",
+          "unsafe-file",
+          "unsafe-home-root",
+          "unsafe-sessions-root"
+        ]
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "compressed-session-files-protected",
+          "session-directory-unreadable",
+          "session-file-limit-reached",
+          "size-filtered-estimate-is-lower-bound",
+          "unsafe-session-directory-skipped"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    }
+  }
+}

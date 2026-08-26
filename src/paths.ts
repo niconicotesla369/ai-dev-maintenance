@@ -6,6 +6,9 @@ import type { SqliteMode } from './types.js';
 const macHomePathPattern = /\/Users\/[^/]+/g;
 const nonHomeAbsolutePathStart = /\/(?:private|Volumes|tmp|var)\//g;
 
+export const CODEX_SESSION_MONITOR_LABEL =
+  'com.niconicotesla369.ai-dev-maintenance.codex-session-monitor';
+
 export function createSqliteUri(absolutePath: string, mode: SqliteMode): string {
   if (!path.isAbsolute(absolutePath)) {
     throw new Error('SQLite paths must be absolute');
@@ -72,4 +75,25 @@ export function resolveHome(env: NodeJS.ProcessEnv = process.env): string {
 
 export function appDataHome(env: NodeJS.ProcessEnv = process.env): string {
   return path.join(resolveHome(env), '.ai-dev-maintenance');
+}
+
+export function monitorDataDir(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(appDataHome(env), 'monitor');
+}
+
+export function codexSessionMonitorStatePath(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(monitorDataDir(env), 'codex-sessions-state.v1.json');
+}
+
+export function codexSessionMonitorReportPath(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(monitorDataDir(env), 'codex-sessions-latest.v1.json');
+}
+
+export function codexSessionMonitorLaunchAgentPath(env: NodeJS.ProcessEnv = process.env): string {
+  return path.join(
+    resolveHome(env),
+    'Library',
+    'LaunchAgents',
+    `${CODEX_SESSION_MONITOR_LABEL}.plist`
+  );
 }

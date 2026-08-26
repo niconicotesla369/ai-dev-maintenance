@@ -15,6 +15,7 @@
     "status": {
       "enum": [
         "ok",
+        "partial",
         "blocked"
       ]
     },
@@ -25,7 +26,11 @@
     "action": {
       "enum": [
         "codex-fix",
-        "cursor-clean"
+        "cursor-clean",
+        "codex-sparkle-clean",
+        "codex-session-image-prune",
+        "codex-session-monitor-install",
+        "codex-session-monitor-remove"
       ]
     },
     "applied": {

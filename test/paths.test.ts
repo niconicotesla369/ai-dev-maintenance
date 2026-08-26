@@ -1,7 +1,16 @@
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { appDataHome, defaultCodexHome, resolveHome } from '../src/paths.js';
+import {
+  appDataHome,
+  CODEX_SESSION_MONITOR_LABEL,
+  codexSessionMonitorLaunchAgentPath,
+  codexSessionMonitorReportPath,
+  codexSessionMonitorStatePath,
+  defaultCodexHome,
+  monitorDataDir,
+  resolveHome
+} from '../src/paths.js';
 
 describe('home path resolution', () => {
   test('resolves HOME from an injected environment before falling back to os.homedir', () => {
@@ -41,5 +50,31 @@ describe('home path resolution', () => {
       codexHome: '/tmp/alternate-codex',
       custom: true
     });
+  });
+
+  test('uses fixed private monitor and LaunchAgent paths under the injected HOME', () => {
+    const home = '/tmp/aidm-home';
+    const env = { HOME: home };
+
+    expect(CODEX_SESSION_MONITOR_LABEL).toBe(
+      'com.niconicotesla369.ai-dev-maintenance.codex-session-monitor'
+    );
+    expect(monitorDataDir(env)).toBe(
+      path.join(home, '.ai-dev-maintenance', 'monitor')
+    );
+    expect(codexSessionMonitorStatePath(env)).toBe(
+      path.join(home, '.ai-dev-maintenance', 'monitor', 'codex-sessions-state.v1.json')
+    );
+    expect(codexSessionMonitorReportPath(env)).toBe(
+      path.join(home, '.ai-dev-maintenance', 'monitor', 'codex-sessions-latest.v1.json')
+    );
+    expect(codexSessionMonitorLaunchAgentPath(env)).toBe(
+      path.join(
+        home,
+        'Library',
+        'LaunchAgents',
+        'com.niconicotesla369.ai-dev-maintenance.codex-session-monitor.plist'
+      )
+    );
   });
 });

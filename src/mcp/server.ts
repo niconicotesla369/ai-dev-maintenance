@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline';
 import type { Readable, Writable } from 'node:stream';
-import { createMaintenancePlan } from '../plan.js';
+import { createMaintenancePlan, type MaintenancePlanSummary } from '../plan.js';
 import { runDoctor } from '../doctor.js';
 import { runPressureDoctor } from '../pressure/doctor.js';
 import { buildHistoryReport } from '../history.js';
@@ -9,6 +9,13 @@ import { redactPath } from '../paths.js';
 import { TOOL_VERSION } from '../version.js';
 import type { MaintenanceReport } from '../types.js';
 import { jsonRpcError, jsonRpcResult, type JsonRpcId, type JsonRpcRequest, type JsonRpcResponse } from './protocol.js';
+
+export type McpPlanAction = 'codex-fix' | 'cursor-clean';
+
+type CreateMcpPlanOptions = {
+  action: McpPlanAction;
+  env?: NodeJS.ProcessEnv;
+};
 
 export type McpCommands = {
   runDoctor: (options?: {
@@ -21,7 +28,7 @@ export type McpCommands = {
   runPressureDoctor: typeof runPressureDoctor | (() => Promise<unknown>);
   latestReport: typeof latestReport;
   runHistory: typeof buildHistoryReport | ((options?: { env?: NodeJS.ProcessEnv }) => Promise<unknown>);
-  createPlan: typeof createMaintenancePlan;
+  createPlan: (options: CreateMcpPlanOptions) => Promise<MaintenancePlanSummary>;
 };
 
 export type McpRuntime = {
@@ -34,6 +41,8 @@ type McpTool = {
   description: string;
   inputSchema: Record<string, unknown>;
 };
+
+const MCP_PLAN_ACTIONS = ['codex-fix', 'cursor-clean'] as const satisfies readonly McpPlanAction[];
 
 const MCP_TOOLS: McpTool[] = [
   {
@@ -64,7 +73,7 @@ const MCP_TOOLS: McpTool[] = [
       additionalProperties: false,
       properties: {
         action: {
-          enum: ['codex-fix', 'cursor-clean']
+          enum: [...MCP_PLAN_ACTIONS]
         }
       },
       required: ['action']
@@ -169,7 +178,7 @@ async function handleMcpRequest(
   if (request.method === 'tools/call') {
     return await callTool(request, runtime);
   }
-  return jsonRpcError(requestId(request), -32601, `Method not found: ${request.method}`);
+  return jsonRpcError(requestId(request), -32601, 'Method not found');
 }
 
 function negotiateProtocolVersion(value: unknown): string {
@@ -208,13 +217,16 @@ async function callTool(
       case 'aidm_history':
         return toolResult(requestId(request), await runtime.commands.runHistory({ env: runtime.env }));
       case 'aidm_plan': {
-        if (args.action !== 'codex-fix' && args.action !== 'cursor-clean') {
+        if (!hasExactKeys(args, ['action'])) {
+          return jsonRpcError(requestId(request), -32602, 'Invalid aidm_plan arguments');
+        }
+        if (!isMcpPlanAction(args.action)) {
           return jsonRpcError(requestId(request), -32602, 'Invalid aidm_plan action');
         }
         return toolResult(requestId(request), await runtime.commands.createPlan({ action: args.action, env: runtime.env }));
       }
       default:
-        return jsonRpcError(requestId(request), -32602, `Unknown tool: ${name}`);
+        return jsonRpcError(requestId(request), -32602, 'Unknown tool');
     }
   } catch (error) {
     return jsonRpcError(requestId(request), -32000, redactPath(error instanceof Error ? error.message : String(error)));
@@ -244,4 +256,14 @@ function emptyInputSchema(): Record<string, unknown> {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function hasExactKeys(value: Record<string, unknown>, expectedKeys: readonly string[]): boolean {
+  const actualKeys = Object.keys(value);
+  return actualKeys.length === expectedKeys.length
+    && expectedKeys.every((key) => Object.hasOwn(value, key));
+}
+
+function isMcpPlanAction(value: unknown): value is McpPlanAction {
+  return value === 'codex-fix' || value === 'cursor-clean';
 }

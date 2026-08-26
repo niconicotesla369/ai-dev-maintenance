@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { sanitizeReportForOutput, writeReport } from '../src/reports.js';
 import { redactPath } from '../src/paths.js';
 import { formatCliError } from '../src/cli.js';
+import { runMcpSession } from '../src/mcp/server.js';
 import type { MaintenanceReport } from '../src/types.js';
 
 describe('privacy boundaries', () => {
@@ -144,5 +145,29 @@ describe('privacy boundaries', () => {
 
     expect(output).toContain('<home>');
     expect(output).not.toContain(rawPath);
+  });
+
+  test('MCP protocol errors do not reflect private method or tool names', async () => {
+    const rawPath = ['', 'Users', 'example', '.codex', 'sessions', 'private.jsonl'].join('/');
+    const input = [
+      JSON.stringify({ jsonrpc: '2.0', id: 1, method: rawPath, params: {} }),
+      JSON.stringify({
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: { name: rawPath, arguments: {} }
+      })
+    ].join('\n');
+
+    const output = await runMcpSession(`${input}\n`);
+    const responses = output.trim().split('\n').map((line) => JSON.parse(line)) as Array<{
+      error: { code: number; message: string };
+    }>;
+
+    expect(output).not.toContain(rawPath);
+    expect(responses.map((response) => response.error)).toEqual([
+      { code: -32601, message: 'Method not found' },
+      { code: -32602, message: 'Unknown tool' }
+    ]);
   });
 });

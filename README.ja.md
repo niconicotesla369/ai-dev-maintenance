@@ -2,9 +2,52 @@
 
 Codexの追跡対象状態を重複なく網羅し、volume contextも確認しながら、追跡対象bytesとreclaimableなディスク容量を混同せず安全に診断するCLIです。
 
-v0.5.0では、`CODEX_HOME` 配下のすべての通常ファイルを、既知の重複しないバケットとprivateな `other-state` で網羅して診断し、metadata-onlyなvolume contextとlower-bound warningを追加しました。追跡対象状態とreclaimableなbytesの違いを明示しつつ、Codex / Claude Code / Cursor のローカル状態診断、Cursorの安全なcache/log cleanup、ガイド付き診断とlive pressure checkのターミナル向けpretty output、公開投稿向けのpath-freeな `doctor --share` / `pressure --share` カードを提供します。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も利用できます。
+v0.6.0は、v0.5の追跡対象状態の互換契約を維持したまま、明示的な画像見積もり、条件付きの正確なSparkle cleanup、native-compression status、任意のローカルsession monitorを追加します。machine-readableなJSON契約、ローカル `plan` / `apply`、read-only history、実験的なstdio-only MCP server、`aidm trust` も利用できます。
 
 `doctor` は `lstat` / `readdir` / `statfs` によるファイルサイズ・volume metadataの取得と、ローカルに伏せ字済み診断レポートを書くだけです。チャット本文の読み取り、アプリDBのオープン、アップロード、ファイル削除、セッション履歴の書き換え、trigger追加、設定変更は行いません。
+
+## ローカルVisual Report（一時表示）
+
+CLI限定・read-onlyのVisual Reportは、次のいずれかのコマンドでローカルに開けます。
+
+```bash
+aidm doctor --html
+aidm report --latest --html
+```
+
+AIDMは、Visual Reportをループバックアドレス `127.0.0.1` のみに配信します。外部へのアップロードやリクエストは一切行いません。「Ephemeral HTML」とはメモリ上だけの文書を意味し、後から削除される一時ファイルではありません。HTMLファイルは最初から書き込みません。表示は日本語 / 英語に切り替えられ、選択した言語は `sessionStorage` に保存されて現在のブラウザセッション中だけ有効です。ページを閉じるかセッションの有効期限が切れると、AIDMはメモリ上の表示を破棄し、トークン付きURLも利用できなくなります。
+
+zero-fileという約束はHTMLだけが対象です。元データやツールの状態、通常保存される伏せ字済みJSONレポート、一時的なHTML表示、ブラウザ管理の履歴やキャッシュを分けて考えてください。`doctor --html` は通常どおり診断を行い、既存のretention方針に従って伏せ字済みJSONレポートを作成・保持します。`report --latest --html` は既存の最新の伏せ字済みJSONレポートを読み取り、新たな診断もレポート書き込みも行いません。表示機能自体は元データのcopyを作らず、ツールの状態も変更しません。
+
+表示終了後も、ブラウザの履歴には利用できないトークン付きのループバックURLが残る場合があります。AIDMは `Cache-Control: no-store` を送信しますが、ブラウザ管理の履歴やキャッシュまでは制御できません。ブラウザデータの完全な消去や、APFSでのbyte-for-byte reclaimは保証しません。
+
+Visual Reportでできるのは、固定allowlistに含まれるplanコマンドの表示とcopyだけです。`plan` / `apply` / cleanupを実行できず、MCPにも公開されません。HTML modeは `--json`, `--share`, `--show-paths`, `--plain`, `--no-banner` と互換性がありません。
+
+## v0.6 Guided Codex Reclaim
+
+`doctor はmetadata-onlyのまま`であり、session本文を読みません。`reclaim scan codex-session-images` は別の明示的CLI commandで、見積もりのためだけに `session fileを読みます`。defaultは `--older-than-days 30` と `--min-file-size-mb 50`（binary MiB）で、plan作成・書き換えは行いません。
+
+```bash
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim scan codex-session-images
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim status codex-native-compression
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- monitor codex-sessions
+aidm plan codex-session-image-prune --older-than-days 30 --min-file-size-mb 50
+aidm apply --plan <planId> --yes --accept-image-loss
+aidm plan codex-sparkle-clean
+aidm apply --plan <planId> --yes
+aidm plan codex-session-monitor-install --threshold-gib 8 --growth-gib 5
+aidm apply --plan <planId> --yes
+aidm plan codex-session-monitor-remove
+aidm apply --plan <planId> --yes
+```
+
+画像pruneは `不可逆かつCLI限定` です。scheduleやMCPからは実行できず、matching private planと両方のconfirmationが必要です。unattended deletionはありません。default `$HOME/.codex` 配下のinactiveなplain `*.jsonl`で、再検証に合格したfileだけを対象にします。custom `CODEX_HOME`（`$HOME/.codex` 以外）と `.jsonl.zst` はunsupportedでblockします。manifest mode `0600` のrecovery manifestは `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl` に書き込みます。legacy anonymous placeholderは `ファイルだけから監査できません`。そのためAIDMのものとは扱いません。
+
+成功時はlogical `Reclaimed` bytesと、測定できる場合はhuman labelの `Free-space delta` を表示し、JSONは `volumeFreeDeltaBytes` を使います。APFS accountingや同時writeのためfree-space equalityは保証しません。global preflight failureなら変更しません。post-mutation failureは `partial` となりplanを消費します。manifestにはstableなevidenceを残します。universalなcompression ratio（`104x`を含む）は約束しません。
+
+native statusはadvisoryであり、`Codex native-compressionの設定を変更しません`。`config.toml`を読まず、sessionをrecompressせず、`.zst`を展開しません。Sparkle cleanupは `<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` の `Installation/*` だけを対象にする `正確なCodex Sparkle` cleanupです。`すべての安全確認に合格した場合だけ` 実行し、`Launcher/`、`PersistentDownloads/`、generic updater、native configは変更しません。
+
+monitorは `opt-in` です。手動 `aidm monitor codex-sessions` はmetadata-onlyでpersistしません。明示的plan/apply installはLaunchAgent plistを書き込みbootstrapします。plistは `<home>/Library/LaunchAgents/com.niconicotesla369.ai-dev-maintenance.codex-session-monitor.plist` です。scheduled runがmonitor stateとlatest reportをpersistします。保存先は `<home>/.ai-dev-maintenance/monitor/` の `codex-sessions-state.v1.json` と `codex-sessions-latest.v1.json` で、ローカルstateを書き込みます。default scheduleは毎月1日04:30 local time（`LowPriorityIO=true`、`Nice=10`）、alert defaultは総session state 8 GiBまたは5 GiB growthです。notification deliveryはbest-effortで、failureはwarningでありcleanupを起動しません。validated Node/AIDM pathを移動したらmonitorをreinstallしてください。`MCPはこれらの新しいactionを呼び出せません`。
 
 ## 追跡対象の状態と互換性
 
@@ -12,7 +55,7 @@ v0.5.0では、`CODEX_HOME` 配下のすべての通常ファイルを、既知�
 
 custom `CODEX_HOME` が正確なSparkle rootと重なる場合は、境界安全なpath所有権によってunionを一度だけ表示します。より広いrootが所有し、同じrootならcustomを優先します。custom ownerはprivateなバケットとremainderを維持し、より広いSparkle ownerはreview-firstではなく保守的に `never` として扱います。
 
-重ならない場合、`<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` にある正確な `org.sparkle-project.Sparkle` のcacheは、確認が必要（review-first）として表示し、自動削除しません。汎用のupdater globはscanもcleanupもしません。AIDMはCodexのsessionやSparkleをcleanupしません。
+重ならない場合、`<home>/Library/Caches/com.openai.codex/org.sparkle-project.Sparkle` にある正確な `org.sparkle-project.Sparkle` のcacheは、確認が必要（review-first）として表示し、自動削除しません。汎用のupdater globはscanもcleanupもしません。`doctor` とautomatic cleanupはCodexのsessionやSparkleを対象にせず、上記v0.6の明示的かつ再検証済みCLI `plan` / `apply` だけが限定的な例外です。
 
 metadata-onlyなファイルサイズscanに加え、`doctor` は `statfs` でmetadata-onlyなvolume contextを取得します。ファイル本文は読みません。scanがtruncatedの場合は下限値として表示するため、bytesは完全な計測値ではなく最小値です。providerのlogical bytesとvolumeのallocated usageは別の計測値なので、tracked-shareの割合は診断用であり、因果関係を示すものではありません。
 
@@ -37,7 +80,7 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.5.0
+npx --yes ai-dev-maintenance@0.6.0
 ```
 
 通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
@@ -46,13 +89,13 @@ npx --yes ai-dev-maintenance@0.5.0
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -60,7 +103,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.5.0
+npm install -g ai-dev-maintenance@0.6.0
 aidm
 ```
 
@@ -71,19 +114,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -91,8 +134,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- fix --safe --yes
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.5.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。
@@ -108,35 +151,47 @@ ai-dev-maintenance [--wait] [--wait-timeout <minutes>] [--no-interactive] [--pla
 ai-dev-maintenance --help | -h
 ai-dev-maintenance --version | -v | version
 ai-dev-maintenance logo [--plain]
-ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--no-banner]
+ai-dev-maintenance doctor [--json] [--show-paths] [--share] [--html] [--no-banner]
 ai-dev-maintenance pressure [--json] [--share] [--no-banner] [--plain]
 ai-dev-maintenance history [--json] [--plain]
 ai-dev-maintenance trust [--json]
+ai-dev-maintenance reclaim scan codex-session-images [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+ai-dev-maintenance reclaim status codex-native-compression [--json]
+ai-dev-maintenance monitor codex-sessions [--json]
 ai-dev-maintenance cursor clean --safe [--yes]
 ai-dev-maintenance fix --safe --yes
-ai-dev-maintenance report --latest [--show-paths]
+ai-dev-maintenance report --latest [--show-paths] [--json] [--html]
 ai-dev-maintenance reports prune --yes
 ai-dev-maintenance backups prune --yes
 ai-dev-maintenance restore validate --backup <path>
-ai-dev-maintenance plan codex-fix|cursor-clean [--json]
-ai-dev-maintenance apply --plan <planId> --yes [--json]
+ai-dev-maintenance plan codex-fix|cursor-clean|codex-sparkle-clean [--json]
+ai-dev-maintenance plan codex-session-image-prune [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+ai-dev-maintenance plan codex-session-monitor-install [--threshold-gib <GiB>] [--growth-gib <GiB>] [--json]
+ai-dev-maintenance plan codex-session-monitor-remove [--json]
+ai-dev-maintenance apply --plan <planId> --yes [--accept-image-loss] [--json]
 ai-dev-maintenance mcp serve
 aidm [--wait] [--wait-timeout <minutes>] [--no-interactive] [--plain]
 aidm --help | -h
 aidm --version | -v | version
 aidm logo [--plain]
-aidm doctor [--json] [--show-paths] [--share] [--no-banner]
+aidm doctor [--json] [--show-paths] [--share] [--html] [--no-banner]
 aidm pressure [--json] [--share] [--no-banner] [--plain]
 aidm history [--json] [--plain]
 aidm trust [--json]
+aidm reclaim scan codex-session-images [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+aidm reclaim status codex-native-compression [--json]
+aidm monitor codex-sessions [--json]
 aidm cursor clean --safe [--yes]
 aidm fix --safe --yes
-aidm report --latest [--show-paths]
+aidm report --latest [--show-paths] [--json] [--html]
 aidm reports prune --yes
 aidm backups prune --yes
 aidm restore validate --backup <path>
-aidm plan codex-fix|cursor-clean [--json]
-aidm apply --plan <planId> --yes [--json]
+aidm plan codex-fix|cursor-clean|codex-sparkle-clean [--json]
+aidm plan codex-session-image-prune [--older-than-days <days>] [--min-file-size-mb <MiB>] [--json]
+aidm plan codex-session-monitor-install [--threshold-gib <GiB>] [--growth-gib <GiB>] [--json]
+aidm plan codex-session-monitor-remove [--json]
+aidm apply --plan <planId> --yes [--accept-image-loss] [--json]
 aidm mcp serve
 ```
 

@@ -1,0 +1,16 @@
+AIDM SESSION IMAGE RECLAIM
+
+Content access  Reads candidate Codex session JSONL contents locally; no session content is printed or uploaded.
+Image scan      ok
+Content read    yes
+Candidate files 2
+Files opened    2
+Files blocked   0
+Images          3
+Source size     100.0 MiB
+Projected size  20.0 MiB
+Reclaimable     80.0 MiB
+Changed         nothing; estimate only
+Warning         size-filtered-estimate-is-lower-bound
+
+Consent         Irreversible image loss; apply requires both --yes and --accept-image-loss.

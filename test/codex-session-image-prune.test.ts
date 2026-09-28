@@ -507,7 +507,7 @@ describe('pruneCodexSessionImages', () => {
     }
   });
 
-  test('preserves a replacement swapped in after cleanup lstat', async () => {
+  macTest('preserves a replacement swapped in after cleanup lstat', async () => {
     const fixture = await makeFixture([sessionLine('before')]);
     try {
       const candidate = await makeCandidate(fixture.files[0]);

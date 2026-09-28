@@ -17,6 +17,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { collectFileIdentity } from '../src/fs-safety.js';
 import { SESSION_IMAGE_PLACEHOLDER_URL } from '../src/reclaim/session-image-format.js';
 
+// These cases exercise macOS-only behavior; the unsupported-platform cases still run everywhere.
+const macTest = process.platform === 'darwin' ? test : test.skip;
+
 const streamHooks = vi.hoisted(() => ({
   requested: [] as string[],
   failures: new Map<string, 'line-too-large' | 'invalid-utf8'>(),
@@ -60,7 +63,7 @@ afterEach(() => {
 });
 
 describe('scanCodexSessionImages', () => {
-  test('opens only old large plain JSONL files and admits only fully safe candidates', async () => {
+  macTest('opens only old large plain JSONL files and admits only fully safe candidates', async () => {
     const fixture = await makeFixture();
     try {
       const safeLine = imageJsonlLine(LARGE_PAYLOAD);
@@ -227,7 +230,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('blocks a custom CODEX_HOME before reading files', async () => {
+  macTest('blocks a custom CODEX_HOME before reading files', async () => {
     const fixture = await makeFixture();
     try {
       const custom = path.join(fixture.home, 'custom-codex');
@@ -254,7 +257,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('blocks an unsafe sessions-root symlink before reading files', async () => {
+  macTest('blocks an unsafe sessions-root symlink before reading files', async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-session-scan-root-'));
     const outside = path.join(home, 'outside');
     try {
@@ -282,7 +285,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('blocks a symlinked default Codex root before reading files', async () => {
+  macTest('blocks a symlinked default Codex root before reading files', async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-session-scan-home-'));
     const outside = await mkdtemp(path.join(os.tmpdir(), 'aidm-session-scan-outside-'));
     try {
@@ -342,7 +345,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('uses one verified descriptor when the path is swapped and restored during scanning', async () => {
+  macTest('uses one verified descriptor when the path is swapped and restored during scanning', async () => {
     const fixture = await makeFixture();
     try {
       const originalLine = imageJsonlLine(Buffer.alloc(768, 0x41).toString('base64'));
@@ -379,7 +382,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('does not admit a file whose data URLs are only embedded in text', async () => {
+  macTest('does not admit a file whose data URLs are only embedded in text', async () => {
     const fixture = await makeFixture();
     try {
       const embeddedOnly = await fixture.writeSession(
@@ -412,7 +415,7 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
-  test('returns an empty successful scan when the default sessions root is absent', async () => {
+  macTest('returns an empty successful scan when the default sessions root is absent', async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-session-scan-empty-'));
     try {
       const result = await scanCodexSessionImages({
@@ -435,7 +438,7 @@ describe('scanCodexSessionImages', () => {
 });
 
 describe('publicCodexSessionImageScanResult', () => {
-  test('projects aggregate redacted data without paths, hashes, identities, or per-file records', async () => {
+  macTest('projects aggregate redacted data without paths, hashes, identities, or per-file records', async () => {
     const fixture = await makeFixture();
     try {
       const privatePath = await fixture.writeSession(

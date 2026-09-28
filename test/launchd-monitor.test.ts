@@ -17,6 +17,9 @@ import path from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import type { CommandRunResult } from '../src/types.js';
 
+// These cases exercise macOS-only behavior; the unsupported-platform cases still run everywhere.
+const macTest = process.platform === 'darwin' ? test : test.skip;
+
 const fsHooks = vi.hoisted(() => ({
   events: [] as string[],
   beforeLstat: undefined as ((target: string) => Promise<void>) | undefined,
@@ -181,7 +184,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('durably installs the exact plist before bounded launchctl bootstrap', async () => {
+  macTest('durably installs the exact plist before bounded launchctl bootstrap', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -220,7 +223,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('blocks concurrent install and remove operations on the same LaunchAgents directory', async () => {
+  macTest('blocks concurrent install and remove operations on the same LaunchAgents directory', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     const directoryFlag = typeof constants.O_DIRECTORY === 'number' ? constants.O_DIRECTORY : 0;
@@ -259,7 +262,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test.each([
+  macTest.each([
     ['unsafe node', 'node'],
     ['unsafe CLI script', 'cli']
   ])('blocks an %s before writing or invoking launchctl', async (_label, target) => {
@@ -283,7 +286,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('blocks a current-user Node file that is executable only for another class', async () => {
+  macTest('blocks a current-user Node file that is executable only for another class', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -304,7 +307,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('blocks Node identity drift before committing the plist', async () => {
+  macTest('blocks Node identity drift before committing the plist', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     let inspections = 0;
@@ -328,7 +331,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('preserves the installed plist and reports partial when bootstrap fails', async () => {
+  macTest('preserves the installed plist and reports partial when bootstrap fails', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -350,7 +353,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('does not bootstrap when plist directory fsync fails after rename', async () => {
+  macTest('does not bootstrap when plist directory fsync fails after rename', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -372,7 +375,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('does not bootstrap a plist whose identity drifts after the durable rename', async () => {
+  macTest('does not bootstrap a plist whose identity drifts after the durable rename', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     let targetInspections = 0;
@@ -399,7 +402,7 @@ describe('LaunchAgent install', () => {
     }
   });
 
-  test('returns blocked without a local change when temporary creation fails', async () => {
+  macTest('returns blocked without a local change when temporary creation fails', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -418,7 +421,7 @@ describe('LaunchAgent install', () => {
 });
 
 describe('LaunchAgent remove', () => {
-  test('boots out before unlinking the exact pinned plist', async () => {
+  macTest('boots out before unlinking the exact pinned plist', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -446,7 +449,7 @@ describe('LaunchAgent remove', () => {
     }
   });
 
-  test('preserves the plist when bootout fails before any known change', async () => {
+  macTest('preserves the plist when bootout fails before any known change', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -466,7 +469,7 @@ describe('LaunchAgent remove', () => {
     }
   });
 
-  test('does not boot out through a LaunchAgents directory whose authority drifts', async () => {
+  macTest('does not boot out through a LaunchAgents directory whose authority drifts', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     const launchAgents = path.dirname(fixture.plistPath);
@@ -497,7 +500,7 @@ describe('LaunchAgent remove', () => {
     }
   });
 
-  test('reports partial when bootout succeeds but unlink fails', async () => {
+  macTest('reports partial when bootout succeeds but unlink fails', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -519,7 +522,7 @@ describe('LaunchAgent remove', () => {
     }
   });
 
-  test('preserves a drifted plist after successful bootout', async () => {
+  macTest('preserves a drifted plist after successful bootout', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -549,7 +552,7 @@ describe('LaunchAgent remove', () => {
     }
   });
 
-  test('is a no-op when the exact plist is absent', async () => {
+  macTest('is a no-op when the exact plist is absent', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {
@@ -571,7 +574,7 @@ describe('LaunchAgent remove', () => {
 });
 
 describe('fixed monitor notification', () => {
-  test('passes one sanitized metric message separately from fixed AppleScript source', async () => {
+  macTest('passes one sanitized metric message separately from fixed AppleScript source', async () => {
     const fixture = await makeFixture();
     const commandCalls: CommandCall[] = [];
     try {

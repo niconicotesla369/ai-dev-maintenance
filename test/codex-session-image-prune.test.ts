@@ -17,6 +17,9 @@ import path from 'node:path';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { collectFileIdentity } from '../src/fs-safety.js';
 
+// These cases exercise macOS-only behavior; the unsupported-platform cases still run everywhere.
+const macTest = process.platform === 'darwin' ? test : test.skip;
+
 const preflightHooks = vi.hoisted(() => ({
   calls: [] as Array<Record<string, unknown>>,
   beforeReturn: undefined as (() => Promise<void>) | undefined,
@@ -450,7 +453,7 @@ describe('pruneCodexSessionImages', () => {
     }
   });
 
-  test('revalidates the prepared temporary by inode immediately before rename', async () => {
+  macTest('revalidates the prepared temporary by inode immediately before rename', async () => {
     const fixture = await makeFixture([sessionLine('before')]);
     try {
       const candidate = await makeCandidate(fixture.files[0]);

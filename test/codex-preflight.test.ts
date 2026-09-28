@@ -14,6 +14,9 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { collectFileIdentity } from '../src/fs-safety.js';
 import type { FileIdentity } from '../src/types.js';
 
+// These cases exercise macOS-only behavior; the unsupported-platform cases still run everywhere.
+const macTest = process.platform === 'darwin' ? test : test.skip;
+
 const GIB = 1024 ** 3;
 
 const commandHooks = vi.hoisted(() => ({
@@ -111,7 +114,7 @@ afterEach(() => {
 });
 
 describe('preflightCodexSessionMutation', () => {
-  test('allows a fully safe closed target with sufficient temporary space', async () => {
+  macTest('allows a fully safe closed target with sufficient temporary space', async () => {
     const fixture = await makeFixture();
     try {
       const result = await preflightCodexSessionMutation({
@@ -160,7 +163,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks custom CODEX_HOME and an empty target set before external checks', async () => {
+  macTest('blocks custom CODEX_HOME and an empty target set before external checks', async () => {
     const fixture = await makeFixture();
     try {
       const custom = await preflightCodexSessionMutation({
@@ -185,7 +188,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks Codex GUI, Helper, and CLI process lines', async () => {
+  macTest('blocks Codex GUI, Helper, and CLI process lines', async () => {
     const fixture = await makeFixture();
     const processLists = [
       '101 /Applications/Codex.app/Contents/MacOS/Codex --started-from-launchd',
@@ -207,7 +210,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks unusable and truncated process discovery with bounded output', async () => {
+  macTest('blocks unusable and truncated process discovery with bounded output', async () => {
     const fixture = await makeFixture();
     try {
       commandHooks.psResult = commandResult({ stdoutTruncated: true });
@@ -256,7 +259,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks unusable lsof and any reported target handle without exposing output', async () => {
+  macTest('blocks unusable lsof and any reported target handle without exposing output', async () => {
     const fixture = await makeFixture();
     try {
       commandHooks.lsofResults.push(commandResult({
@@ -289,7 +292,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('treats lsof missing-path diagnostics as unusable for a mutation preflight', async () => {
+  macTest('treats lsof missing-path diagnostics as unusable for a mutation preflight', async () => {
     const fixture = await makeFixture();
     try {
       commandHooks.lsofResults.push(commandResult({
@@ -312,7 +315,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('batches many lsof targets without omitting or duplicating a path', async () => {
+  macTest('batches many lsof targets without omitting or duplicating a path', async () => {
     const fixture = await makeFixture(65);
     try {
       const result = await preflightCodexSessionMutation({
@@ -340,7 +343,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks identity drift and compressed sibling state', async () => {
+  macTest('blocks identity drift and compressed sibling state', async () => {
     const driftFixture = await makeFixture();
     const compressedFixture = await makeFixture();
     try {
@@ -367,7 +370,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks unsafe target mode, owner, hardlink, and symlink', async () => {
+  macTest('blocks unsafe target mode, owner, hardlink, and symlink', async () => {
     const cases: Array<(fixture: PreflightFixture) => Promise<void>> = [
       async (fixture) => chmod(fixture.targets[0].path, 0o666),
       async (fixture) => {
@@ -400,7 +403,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('requires both five GiB available and the temporary result plus one GiB', async () => {
+  macTest('requires both five GiB available and the temporary result plus one GiB', async () => {
     const fixture = await makeFixture();
     try {
       statfsHooks.result.bavail = (4 * GIB) / statfsHooks.result.bsize;
@@ -425,7 +428,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('blocks when free-space measurement is unavailable', async () => {
+  macTest('blocks when free-space measurement is unavailable', async () => {
     const fixture = await makeFixture();
     try {
       statfsHooks.error = new Error('synthetic statfs failure');
@@ -446,7 +449,7 @@ describe('preflightCodexSessionMutation', () => {
     }
   });
 
-  test('revalidates the default Codex root after external checks', async () => {
+  macTest('revalidates the default Codex root after external checks', async () => {
     const fixture = await makeFixture();
     try {
       statfsHooks.afterRead = async () => {

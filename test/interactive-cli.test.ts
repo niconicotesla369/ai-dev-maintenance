@@ -265,16 +265,17 @@ describe('guided reclaim CLI', () => {
       apply: { 'cursor-clean': applyResult('cursor-clean', 'blocked', ['plan identity drifted']) },
       targetBytes: { 'cursor-clean': [5_000, 5_000] }
     });
+    const privateHome = ['', 'Users', 'example'].join('/');
     const commands = {
       ...(harness.commands as Record<string, unknown>),
-      writeReclaimRunRecord: async () => '/Users/example/.ai-dev-maintenance/reclaim-runs/reclaim-run-x.json'
+      writeReclaimRunRecord: async () => `${privateHome}/.ai-dev-maintenance/reclaim-runs/reclaim-run-x.json`
     };
 
     const result = await runCli(['--plain'], { env: ENV, io: memoryIo('y\n', true, 100), commands: commands as never });
 
     expect(result.output).toContain('targets changed after the check (is the app running?); nothing was changed. Close it and re-check.');
     expect(result.output).not.toContain('plan identity drifted');
-    expect(result.output).not.toContain('/Users/example');
+    expect(result.output).not.toContain(privateHome);
     expect(result.output).toContain('Saved           <home>/.ai-dev-maintenance/reclaim-runs/reclaim-run-x.json');
   });
 

@@ -77,7 +77,7 @@ describe('scanCodexSessionImages', () => {
       );
       const ambiguous = await fixture.writeSession(
         '2026/01/rollout-ambiguous.jsonl',
-        `${JSON.stringify({ message: 'data:image/png;base64,QUFBQQ==/>' })}\n${' '.repeat(120)}`,
+        `{"image_url":"data:image/png;base64,QUFB\\/QUFB"}\n${' '.repeat(120)}`,
         OLD
       );
       const invalidUtf8 = await fixture.writeSession(
@@ -379,6 +379,39 @@ describe('scanCodexSessionImages', () => {
     }
   });
 
+  test('does not admit a file whose data URLs are only embedded in text', async () => {
+    const fixture = await makeFixture();
+    try {
+      const embeddedOnly = await fixture.writeSession(
+        '2026/01/rollout-embedded.jsonl',
+        `${JSON.stringify({
+          type: 'response_item',
+          payload: {
+            type: 'function_call_output',
+            call_id: 'call-1',
+            output: `.logo{background:url(data:image/png;base64,${LARGE_PAYLOAD})}`
+          }
+        })}\n`,
+        OLD
+      );
+
+      const result = await scanCodexSessionImages({
+        env: { HOME: fixture.home },
+        now: NOW,
+        olderThanDays: 30,
+        minFileSizeBytes: 1
+      });
+
+      expect(result.candidates).toEqual([]);
+      expect(result.totals).toMatchObject({ occurrencesSeen: 0, imagesPrunable: 0, reclaimableBytes: 0 });
+      expect(result.privateOutcomes).toEqual([
+        expect.objectContaining({ path: embeddedOnly, status: 'skipped', code: 'no-prunable-images' })
+      ]);
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
   test('returns an empty successful scan when the default sessions root is absent', async () => {
     const home = await mkdtemp(path.join(os.tmpdir(), 'aidm-session-scan-empty-'));
     try {
@@ -464,9 +497,18 @@ describe('publicCodexSessionImageScanResult', () => {
   });
 });
 
+// Rollout-shaped synthetic fixture; field names mirror Codex response items but are not captured data.
 function imageJsonlLine(payload: string): string {
   return `${JSON.stringify({
-    message: `before data:image/png;base64,${payload}" after`
+    type: 'response_item',
+    payload: {
+      type: 'message',
+      role: 'user',
+      content: [
+        { type: 'input_text', text: 'before after' },
+        { type: 'input_image', image_url: `data:image/png;base64,${payload}` }
+      ]
+    }
   })}\n`;
 }
 

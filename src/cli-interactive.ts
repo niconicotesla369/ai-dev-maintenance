@@ -1,14 +1,31 @@
 import { bannerText } from './cli-banner.js';
-import { renderReport, row, targetSizeRows } from './cli-render.js';
+import { formatBytes } from './cli-render.js';
 import type { NormalizedCliIo } from './cli-io.js';
+import type { ApplyPlanResult, MaintenancePlanSummary } from './plan.js';
+import {
+  RECLAIM_ACTION_LABELS,
+  buildReclaimRunRecord,
+  byteChange,
+  newReclaimRunId,
+  outcomeLabel,
+  renderReclaimRunRecord,
+  sumOrNull,
+  type ReclaimAction,
+  type ReclaimMeasurer,
+  type ReclaimOutcome,
+  type ReclaimRunItem,
+  type ReclaimRunRecord
+} from './reclaim-run.js';
 import { deriveFixReadiness } from './safety.js';
 import type { MaintenanceReport } from './types.js';
-import { TOOL_VERSION } from './version.js';
-import { box, twoColumns } from './ui/components.js';
+import { box } from './ui/components.js';
 
 export type GuidedCommands = {
   runDoctor: (options?: { persistReport?: boolean }) => Promise<{ report: MaintenanceReport; reportPath?: string }>;
-  runFixSafe: () => Promise<{ report: MaintenanceReport; reportPath?: string }>;
+  createPlan: (action: ReclaimAction) => Promise<MaintenancePlanSummary>;
+  applyPlan: (planId: string) => Promise<ApplyPlanResult>;
+  measurer: ReclaimMeasurer;
+  writeRunRecord: (record: ReclaimRunRecord) => Promise<string>;
 };
 
 export type GuidedOptions = {
@@ -32,130 +49,239 @@ export type GuidedResult = {
   outputAlreadyWritten: boolean;
 };
 
+type CandidateStatus = 'ready' | 'blocked' | 'empty';
+
+type Candidate = {
+  action: ReclaimAction;
+  status: CandidateStatus;
+  planId?: string;
+  estimateBytes: number | null;
+  estimateNote?: 'wal-folds-into-database';
+  lines: string[];
+  reasons: string[];
+  waitable: boolean;
+};
+
+const PROTECTED_TEXT = 'chats, session history, settings, sign-ins, workspace state, code, Git';
+
 export async function runGuidedCli(options: GuidedOptions): Promise<GuidedResult> {
   try {
     if (options.banner.enabled) {
       await options.io.write(bannerText({ style: 'hero', color: options.banner.color, columns: options.banner.columns }));
     }
-    if (options.pretty) {
-      await options.io.write(box('AIDM', [
-        'Checking whether Codex cleanup is safe...',
-        'AIDM will not delete chats, rewrite history, or touch Codex while it is open.'
-      ], { width: guidedWidth(options), color: options.banner.color, tone: 'info' }) + '\n');
-    } else {
-      await options.io.write('Checking whether Codex cleanup is safe...\n');
-      await options.io.write('AIDM will not delete chats, rewrite history, or touch Codex while it is open.\n\n');
-    }
-
-    const diagnosis = await options.commands.runDoctor();
-    return handleDoctorResult(options, diagnosis);
+    await writeSection(options, 'AIDM SAFE RECLAIM', [
+      'Reclaims only known, rebuildable caches and SQLite write-ahead logs.',
+      'Always protected:',
+      `  ${PROTECTED_TEXT}.`,
+      'Nothing changes until you approve each item.'
+    ], 'info');
+    return await offerCandidates(options, { waited: false });
   } catch (error) {
     if (error instanceof GuidedAbort) return finish(options, 0);
     throw error;
   }
 }
 
-async function handleDoctorResult(
-  options: GuidedOptions,
-  diagnosis: { report: MaintenanceReport; reportPath?: string }
-): Promise<GuidedResult> {
-  const readiness = deriveFixReadiness(diagnosis.report);
-  if (readiness.safe) return handleReady(options, diagnosis);
-  if (options.pretty) return handlePausedPretty(options, diagnosis, readiness.reasons);
+async function offerCandidates(options: GuidedOptions, state: { waited: boolean }): Promise<GuidedResult> {
+  await options.io.write('Checking what can be reclaimed safely...\n');
+  const diagnosis = await options.commands.runDoctor();
+  const candidates = await discoverCandidates(options, diagnosis.report);
+  await writeCandidates(options, candidates);
 
-  await options.io.write('Codex is using the log database. Cleanup is paused.\n');
-  await options.io.write(row('Status', 'Paused for safety') + '\n');
-  await options.io.write(row('Reason', readiness.reasons.join('; ') || 'not safe to clean yet') + '\n');
-  await options.io.write(row('Target', diagnosis.report.target.pathCategory) + '\n');
-  for (const line of targetSizeRows(diagnosis.report)) await options.io.write(`${line}\n`);
-  await options.io.write('\nCodex is still open, so AIDM will not clean anything yet.\n');
-  await options.io.write('Nothing was changed except a redacted local report.\n');
-  await options.io.write('WAL is SQLite temporary log storage; SHM is SQLite sidecar metadata.\n\n');
-
-  if (options.wait) return waitUntilReady(options);
-
-  while (true) {
-    await writeChoiceMenu(options);
-    const answer = normalizeAnswer(await ask(options, 'Choose [1-4]: '));
-    if (answer === '1' || answer === 'wait') return waitUntilReady(options);
-    if (answer === '2' || answer === 'r' || answer === 'retry') {
-      await options.io.write('\nRe-checking...\n\n');
-      return handleDoctorResult(options, await options.commands.runDoctor());
+  const ready = candidates.filter((candidate) => candidate.status === 'ready');
+  if (ready.length === 0) {
+    const waitable = candidates.some((candidate) => candidate.waitable);
+    if (options.wait && waitable && !state.waited) {
+      if (await waitForCodexRelease(options)) return offerCandidates(options, { waited: true });
+      await options.io.write('Wait timed out. Nothing was changed.\n');
+    } else {
+      await options.io.write('Nothing can be reclaimed right now. Nothing was changed.\n');
     }
-    if (answer === '3' || answer === 'report') {
-      await options.io.write(`Review with: npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest\n`);
-      return finish(options, 0);
-    }
-    if (answer === '4' || answer === 'q' || answer === 'quit' || answer === '') {
-      await options.io.write('No cleanup was run.\n');
-      return finish(options, 0);
-    }
-    await options.io.write('Please choose 1, 2, 3, or 4.\n');
-  }
-}
-
-async function handleReady(
-  options: GuidedOptions,
-  diagnosis: { report: MaintenanceReport; reportPath?: string }
-): Promise<GuidedResult> {
-  if (options.pretty) {
-    await writeReadyPretty(options, diagnosis);
-  } else {
-  await options.io.write(row('Status', 'Ready to clean') + '\n');
-  await options.io.write('Expected cleanup: WAL checkpoint/truncate only.\n');
-  await options.io.write(row('Target', diagnosis.report.target.pathCategory) + '\n');
-  for (const line of targetSizeRows(diagnosis.report)) await options.io.write(`${line}\n`);
-  await options.io.write('\nCodex is closed and no open database handles were found.\n');
-  await options.io.write('AIDM will create a private backup first, then run SQLite WAL checkpoint/truncate.\n');
-  await options.io.write('If any safety check changes, it will stop without modifying the database.\n\n');
+    return recheckOrQuit(options);
   }
 
-  const answer = normalizeAnswer(await ask(options, 'Clean now? [y/N] '));
-  if (answer !== 'y' && answer !== 'yes') {
-    await options.io.write('No cleanup was run.\n');
+  const approved: Candidate[] = [];
+  for (const candidate of ready) {
+    const answer = normalizeAnswer(await ask(options, `Reclaim ${RECLAIM_ACTION_LABELS[candidate.action]}? [y/N] `));
+    if (answer === 'y' || answer === 'yes') approved.push(candidate);
+  }
+  if (approved.length === 0) {
+    await options.io.write('No cleanup was run. Nothing was changed.\n');
     return finish(options, 0);
   }
-
-  await options.io.write('\nRunning safe cleanup...\n');
-  const fix = await options.commands.runFixSafe();
-  await options.io.write(renderReport(fix.report, fix.reportPath));
-  return finish(options, fix.report.status === 'ok' ? 0 : 3);
+  return runApproved(options, approved);
 }
 
-async function waitUntilReady(options: GuidedOptions): Promise<GuidedResult> {
-  await options.io.write('Waiting for Codex to close safely. AIDM will not force close Codex.\n');
+async function discoverCandidates(options: GuidedOptions, doctorReport: MaintenanceReport): Promise<Candidate[]> {
+  return [await codexCandidate(options, doctorReport), await cursorCandidate(options)];
+}
+
+async function codexCandidate(options: GuidedOptions, doctorReport: MaintenanceReport): Promise<Candidate> {
+  const targetState = (doctorReport.findings as Record<string, unknown>).targetState as
+    | { main?: { size?: number }; wal?: { size?: number } }
+    | undefined;
+  const walBytes = targetState?.wal?.size ?? 0;
+  const mainBytes = targetState?.main?.size ?? 0;
+  const base = { action: 'codex-fix' as const, estimateBytes: null, estimateNote: 'wal-folds-into-database' as const };
+  if (walBytes <= 0) {
+    return { ...base, status: 'empty', lines: ['Nothing to fold: no SQLite write-ahead log bytes.'], reasons: [], waitable: false };
+  }
+  const plan = await options.commands.createPlan('codex-fix');
+  const readiness = deriveFixReadiness(doctorReport);
+  const reasons = unique([...plan.blockedReasons, ...(readiness.safe ? [] : readiness.reasons)]);
+  return {
+    ...base,
+    status: plan.status === 'ready' && readiness.safe ? 'ready' : 'blocked',
+    planId: plan.planId,
+    lines: [
+      `Estimate      none: ${formatBytes(walBytes)} WAL is folded into the DB, not deleted`,
+      'Why           SQLite WAL not yet folded into the Codex log DB',
+      `Impact        private backup (~${formatBytes(mainBytes + walBytes)}) kept first; rows kept`
+    ],
+    reasons,
+    waitable: reasons.includes('target database is open by a process')
+  };
+}
+
+async function cursorCandidate(options: GuidedOptions): Promise<Candidate> {
+  const plan = await options.commands.createPlan('cursor-clean');
+  const estimate = plan.preview.reclaimableBytes ?? 0;
+  const base = { action: 'cursor-clean' as const, planId: plan.planId, estimateBytes: estimate, waitable: false };
+  if (plan.status === 'ready' && estimate <= 0) {
+    return { ...base, status: 'empty', lines: ['Nothing to remove: Cursor caches and logs are empty or absent.'], reasons: [] };
+  }
+  return {
+    ...base,
+    status: plan.status === 'ready' ? 'ready' : 'blocked',
+    lines: [
+      `Estimate      ${formatBytes(estimate)} in ${plan.preview.targetCount ?? 0} cache/log folders`,
+      'Why           Cursor rebuilds its caches, VSIX cache, and logs',
+      'Impact        Cursor must be closed; rebuilt on next launch'
+    ],
+    reasons: plan.blockedReasons
+  };
+}
+
+async function writeCandidates(options: GuidedOptions, candidates: Candidate[]): Promise<void> {
+  const lines: string[] = [];
+  for (const [index, candidate] of candidates.entries()) {
+    if (index > 0) lines.push('');
+    lines.push(`[${index + 1}] ${RECLAIM_ACTION_LABELS[candidate.action]}  ${statusLabel(candidate.status)}`);
+    for (const line of candidate.lines) lines.push(`    ${line}`);
+    for (const reason of candidate.reasons) lines.push(`    Reason        ${reason}`);
+  }
+  await writeSection(options, 'WHAT CAN BE RECLAIMED', lines, 'info');
+}
+
+async function runApproved(options: GuidedOptions, approved: Candidate[]): Promise<GuidedResult> {
+  const { measurer } = options.commands;
+  const startedAt = new Date(options.now());
+  const volumeBefore = await measurer.volumeAvailableBytes();
+  const appDataBefore = await measurer.appDataBytes();
+  const items: ReclaimRunItem[] = [];
+
+  for (const candidate of approved) {
+    const before = await measurer.targetBytes(candidate.action);
+    await options.io.write(`Re-checking and reclaiming ${RECLAIM_ACTION_LABELS[candidate.action]}...\n`);
+    let outcome: ReclaimOutcome;
+    let reasons: string[];
+    try {
+      const result = await options.commands.applyPlan(candidate.planId ?? '');
+      outcome = result.status;
+      reasons = result.blockedReasons;
+    } catch (error) {
+      outcome = 'unknown';
+      reasons = [`apply outcome is unknown: ${error instanceof Error ? error.message : String(error)}`];
+    }
+    const after = await measurer.targetBytes(candidate.action);
+    await options.io.write(`  ${outcomeLabel(outcome)}\n`);
+    items.push({
+      action: candidate.action,
+      outcome,
+      estimateBytes: candidate.estimateBytes,
+      ...(candidate.estimateNote ? { estimateNote: candidate.estimateNote } : {}),
+      target: byteChange(before, after),
+      reasons
+    });
+  }
+
+  const appDataAfter = await measurer.appDataBytes();
+  const volumeAfter = await measurer.volumeAvailableBytes();
+  const record = buildReclaimRunRecord({
+    runId: newReclaimRunId(startedAt),
+    startedAt: startedAt.toISOString(),
+    finishedAt: new Date(options.now()).toISOString(),
+    items,
+    managedState: byteChange(
+      sumOrNull([...items.map((item) => item.target.beforeBytes), appDataBefore]),
+      sumOrNull([...items.map((item) => item.target.afterBytes), appDataAfter])
+    ),
+    volume: byteChange(volumeBefore, volumeAfter)
+  });
+
+  let savedPath: string | undefined;
+  let saveWarning: string | undefined;
+  try {
+    savedPath = await options.commands.writeRunRecord(record);
+  } catch (error) {
+    saveWarning = `Result record could not be saved: ${error instanceof Error ? error.message : String(error)}`;
+  }
+  const lines = renderReclaimRunRecord(record, savedPath);
+  if (saveWarning) lines.push(`Warning         ${saveWarning}`);
+  if (savedPath) lines.push('View            aidm report --latest --html');
+  await writeSection(options, 'WHAT CHANGED', lines, record.status === 'ok' ? 'success' : 'info');
+  return finish(options, record.status === 'ok' && !saveWarning ? 0 : 3);
+}
+
+async function waitForCodexRelease(options: GuidedOptions): Promise<boolean> {
+  await options.io.write('Waiting for Codex to release its log database. AIDM will not force close Codex.\n');
   const started = options.now();
   const timeoutMs = options.waitTimeoutMinutes * 60 * 1000;
-
   while (options.now() - started < timeoutMs) {
     const elapsed = options.now() - started;
     await options.sleep(elapsed < 30_000 ? 2_000 : 5_000);
     const diagnosis = await options.commands.runDoctor({ persistReport: false });
-    const readiness = deriveFixReadiness(diagnosis.report);
-    if (readiness.safe) {
-      await options.io.write('\nDatabase released.\n');
-      return handleReady(options, diagnosis);
+    if (deriveFixReadiness(diagnosis.report).safe) {
+      await options.io.write('Database released.\n');
+      return true;
     }
   }
+  return false;
+}
 
-  await options.io.write('Wait timed out. Nothing was changed.\n');
-  if (options.pretty) {
-    await options.io.write(box('What do you want to do?', [
-      '[1] Re-check    Run safety check again now',
+async function recheckOrQuit(options: GuidedOptions): Promise<GuidedResult> {
+  while (true) {
+    await writeSection(options, 'What do you want to do?', [
+      '[1] Re-check    Check again now',
       '[2] Quit        Exit AIDM'
-    ], { width: guidedWidth(options), color: options.banner.color, tone: 'info' }));
-  } else {
-    await options.io.write('What do you want to do?\n');
-    await options.io.write('1. Re-check\n');
-    await options.io.write('2. Quit\n');
+    ], 'info');
+    const answer = normalizeAnswer(await ask(options, 'Choose [1-2]: '));
+    if (answer === '1' || answer === 'r' || answer === 'retry') return offerCandidates(options, { waited: true });
+    if (answer === '2' || answer === 'q' || answer === 'quit' || answer === '') {
+      await options.io.write('No cleanup was run.\n');
+      return finish(options, 0);
+    }
+    await options.io.write('Please choose 1 or 2.\n');
   }
-  const answer = normalizeAnswer(await ask(options, 'Choose [1-2]: '));
-  if (answer === '1' || answer === 'r' || answer === 'retry') {
-    await options.io.write('\nRe-checking...\n\n');
-    return handleDoctorResult(options, await options.commands.runDoctor());
+}
+
+async function writeSection(
+  options: GuidedOptions,
+  title: string,
+  lines: string[],
+  tone: 'info' | 'success'
+): Promise<void> {
+  if (options.pretty) {
+    await options.io.write(`${box(title, lines, { width: guidedWidth(options), color: options.banner.color, tone })}\n`);
+    return;
   }
-  await options.io.write('No cleanup was run.\n');
-  return finish(options, 0);
+  await options.io.write(`${title}\n${lines.map((line) => `${line}\n`).join('')}\n`);
+}
+
+function statusLabel(status: CandidateStatus): string {
+  if (status === 'ready') return 'ready';
+  if (status === 'blocked') return 'paused for safety';
+  return 'nothing to reclaim';
 }
 
 function finish(options: GuidedOptions, exitCode: number): GuidedResult {
@@ -181,113 +307,10 @@ async function ask(options: GuidedOptions, prompt: string): Promise<string> {
 
 class GuidedAbort extends Error {}
 
-async function handlePausedPretty(
-  options: GuidedOptions,
-  diagnosis: { report: MaintenanceReport; reportPath?: string },
-  reasons: string[]
-): Promise<GuidedResult> {
-  const reason = reasons.join('; ') || 'not safe to clean yet';
-  await options.io.write(box('SAFE MAINTENANCE CHECK', [
-    '✓ Checked. Safe. Nothing deleted.',
-    '',
-    'Paused for safety',
-    'Codex is using the log database. Cleanup is paused.',
-    'Codex is still open, so AIDM will not clean anything yet.',
-    'Nothing was changed except a redacted local report.'
-  ], { width: guidedWidth(options), color: options.banner.color, tone: 'success' }) + '\n');
-
-  await options.io.write(targetDatabasePanels(options, diagnosis.report, reason) + '\n');
-  await options.io.write('WAL is SQLite temporary log storage; SHM is SQLite sidecar metadata.\n\n');
-
-  if (options.wait) return waitUntilReady(options);
-
-  while (true) {
-    await writeChoiceMenu(options);
-    const answer = normalizeAnswer(await ask(options, 'Choose [1-4]: '));
-    if (answer === '1' || answer === 'wait') return waitUntilReady(options);
-    if (answer === '2' || answer === 'r' || answer === 'retry') {
-      await options.io.write('\nRe-checking...\n\n');
-      return handleDoctorResult(options, await options.commands.runDoctor());
-    }
-    if (answer === '3' || answer === 'report') {
-      await options.io.write(`Review with: npm exec --ignore-scripts ai-dev-maintenance@${TOOL_VERSION} -- report --latest\n`);
-      return finish(options, 0);
-    }
-    if (answer === '4' || answer === 'q' || answer === 'quit' || answer === '') {
-      await options.io.write('No cleanup was run.\n');
-      return finish(options, 0);
-    }
-    await options.io.write('Please choose 1, 2, 3, or 4.\n');
-  }
-}
-
-async function writeReadyPretty(
-  options: GuidedOptions,
-  diagnosis: { report: MaintenanceReport; reportPath?: string }
-): Promise<void> {
-  await options.io.write(box('READY TO CLEAN', [
-    '✓ Ready to clean',
-    'Expected cleanup: WAL checkpoint/truncate only.',
-    'Codex is closed and no open database handles were found.',
-    'AIDM will create a private backup first, then run SQLite WAL checkpoint/truncate.',
-    'If any safety check changes, it will stop without modifying the database.'
-  ], { width: guidedWidth(options), color: options.banner.color, tone: 'success' }) + '\n');
-  await options.io.write(targetDatabasePanels(options, diagnosis.report) + '\n');
-}
-
-async function writeChoiceMenu(options: GuidedOptions): Promise<void> {
-  if (options.pretty) {
-    await options.io.write(box('What do you want to do?', [
-      '[1] Wait        Check again later',
-      '[2] Re-check    Run safety check again now',
-      '[3] Report      Show report command',
-      '[4] Quit        Exit AIDM'
-    ], { width: guidedWidth(options), color: options.banner.color, tone: 'info' }));
-    return;
-  }
-  await options.io.write('What do you want to do?\n');
-  await options.io.write('1. Wait\n');
-  await options.io.write('2. Re-check\n');
-  await options.io.write('3. Show report command\n');
-  await options.io.write('4. Quit\n');
-}
-
-function targetDatabasePanels(options: GuidedOptions, report: MaintenanceReport, reason?: string): string {
-  const width = guidedWidth(options);
-  const targetLines = [
-    report.target.pathCategory,
-    ...(reason ? [`Reason: ${reason}`] : [])
-  ];
-  const databaseLines = targetSizeRows(report).map((line) => line.trimEnd());
-  if (width >= 96) {
-    const gap = 2;
-    const leftWidth = Math.floor((width - gap) * 0.58);
-    const rightLines = databaseLines.length > 0 ? databaseLines : ['No database sizes available.'];
-    const contentHeight = Math.max(targetLines.length, rightLines.length);
-    return twoColumns(
-      box('Target', padLines(targetLines, contentHeight), { width: leftWidth, color: options.banner.color, tone: 'info' }),
-      box('Database', padLines(rightLines, contentHeight), {
-        width: width - gap - leftWidth,
-        color: options.banner.color,
-        tone: 'info'
-      }),
-      gap
-    ).trimEnd();
-  }
-  return [
-    box('Target', targetLines, { width, color: options.banner.color, tone: 'info' }).trimEnd(),
-    box('Database', databaseLines.length > 0 ? databaseLines : ['No database sizes available.'], {
-      width,
-      color: options.banner.color,
-      tone: 'info'
-    }).trimEnd()
-  ].join('\n');
-}
-
 function guidedWidth(options: GuidedOptions): number {
   return Math.max(80, Math.min(options.io.columns, 110));
 }
 
-function padLines(lines: string[], targetLength: number): string[] {
-  return [...lines, ...Array.from({ length: Math.max(0, targetLength - lines.length) }, () => '')];
+function unique(values: string[]): string[] {
+  return [...new Set(values)];
 }

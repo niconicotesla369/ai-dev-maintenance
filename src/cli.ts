@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { redactPath } from './paths.js';
-import { routeCli, type CliResult, type CliRuntimeOptions } from './cli-router.js';
+import { cliErrorJson, routeCli, type CliResult, type CliRuntimeOptions } from './cli-router.js';
 
 export { fixSafeConfirmationError } from './cli-router.js';
 export { renderReport } from './cli-render.js';
@@ -23,11 +23,14 @@ export function isDirectCliInvocation(moduleUrl: string, argv1: string | undefin
 if (isDirectCliInvocation(import.meta.url, process.argv[1])) {
   runCli()
     .then((result) => {
-      if (!result.outputAlreadyWritten) process.stdout.write(result.output);
+      if (!result.outputAlreadyWritten) {
+        (result.stream === 'stderr' ? process.stderr : process.stdout).write(result.output);
+      }
       process.exitCode = result.exitCode;
     })
     .catch((error) => {
-      process.stderr.write(formatCliError(error));
+      if (process.argv.includes('--json')) process.stdout.write(cliErrorJson(1, formatCliError(error).trim()));
+      else process.stderr.write(formatCliError(error));
       process.exitCode = 1;
     });
 }

@@ -3,6 +3,12 @@
 ## Unreleased
 
 - Document the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.
+- Replace the guided `aidm` flow with an approval-per-item reclaim flow for the Codex log-database write-ahead log and Cursor caches/logs. Each item shows an estimate, reason, and impact; approved items are revalidated through `plan` / `apply` immediately before running; results separate target change, managed-state change, and unattributed volume change, and one private `reclaim-run.v1` record per run is shown by `aidm report --latest --html`.
+- Fix session-image pruning so only JSON values that are exactly a base64 image data URL are replaced; data URLs embedded in tool output, pasted code, or text are no longer rewritten.
+- `fix --safe` now checks free space before its backup, records backup failures as blocked reports, reports any failure after the checkpoint starts as `partial`, and scales SQLite timeouts with database size.
+- `cursor clean --safe --yes` reports failed removals as `partial` and exits with code 3; `plan` / `apply` no longer restores a plan whose engine already changed files.
+- Commands run with `--json` now print a `cli-error.v1` JSON object on stdout when they fail before producing their own JSON; human usage and not-found errors go to stderr.
+- `backups prune --yes` and post-fix retention remove provably abandoned, never-validated backup temporaries and report them as `incompleteDeleted`.
 
 ## 0.6.0 - 2026-08-26
 

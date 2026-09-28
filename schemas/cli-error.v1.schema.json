@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/niconicotesla369/ai-dev-maintenance/schemas/cli-error.v1.schema.json",
+  "title": "AIDM CLI Error v1",
+  "description": "Written to stdout instead of human text when a command run with --json fails before producing its own JSON result. The process exit code matches exitCode.",
+  "type": "object",
+  "required": ["schemaVersion", "status", "exitCode", "error", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": { "const": "error" },
+    "exitCode": { "type": "integer", "minimum": 1 },
+    "error": { "enum": ["not-found", "usage", "blocked", "interrupted", "runtime"] },
+    "message": { "type": "string", "minLength": 1 }
+  }
+}

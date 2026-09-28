@@ -98,7 +98,8 @@ describe('Cursor safe cleanup execution', () => {
 
       const result = await runCursorSafeCleanup({ env: { HOME: home }, yes: true, processList: '' });
 
-      expect(result.status).toBe('ok');
+      expect(result.status).toBe('partial');
+      expect(result.blockedReasons).toContain('some Cursor cleanup entries could not be removed');
       expect(result.reclaimableBytes).toBe(27);
       expect(result.deletedBytes).toBe(20);
       expect(result.deletedBytes).toBeLessThan(result.reclaimableBytes);

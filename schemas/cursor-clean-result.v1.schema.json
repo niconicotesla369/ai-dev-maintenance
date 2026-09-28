@@ -19,7 +19,8 @@
       "enum": [
         "ready",
         "blocked",
-        "ok"
+        "ok",
+        "partial"
       ]
     },
     "mode": {

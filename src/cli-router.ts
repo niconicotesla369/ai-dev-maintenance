@@ -48,6 +48,12 @@ import {
 import type { CliIo } from './cli-io.js';
 import { normalizeCliIo } from './cli-io.js';
 import { runGuidedCli } from './cli-interactive.js';
+import {
+  createReclaimMeasurer as defaultCreateReclaimMeasurer,
+  latestReclaimRunRecord as defaultLatestReclaimRunRecord,
+  writeReclaimRunRecord as defaultWriteReclaimRunRecord,
+  type ReclaimRunRecord
+} from './reclaim-run.js';
 import { renderReport } from './cli-render.js';
 import { formatBytes, row } from './cli-render.js';
 import { renderPressureShareCard, renderShareCard } from './share-card.js';
@@ -96,7 +102,10 @@ export type CliResult = {
   exitCode: number;
   output: string;
   outputAlreadyWritten?: boolean;
+  stream?: 'stdout' | 'stderr';
 };
+
+export type CliErrorKind = 'not-found' | 'usage' | 'blocked' | 'interrupted' | 'runtime';
 
 type RunDoctorCommand = (options?: {
   json?: boolean;
@@ -124,6 +133,9 @@ export type CliCommands = {
   openVisualReport: typeof defaultOpenVisualReport;
   createPlan: typeof defaultCreateMaintenancePlan;
   applyPlan: typeof defaultApplyMaintenancePlan;
+  createReclaimMeasurer: typeof defaultCreateReclaimMeasurer;
+  writeReclaimRunRecord: typeof defaultWriteReclaimRunRecord;
+  latestReclaimRun: typeof defaultLatestReclaimRunRecord;
 };
 
 export type CliRuntimeOptions = {
@@ -135,6 +147,54 @@ export type CliRuntimeOptions = {
 };
 
 export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}): Promise<CliResult> {
+  return applyOutputContract(argv, await routeCliCommand(argv, runtime));
+}
+
+// Failures keep their exit code; --json callers always get JSON, others get errors on stderr.
+function applyOutputContract(argv: string[], result: CliResult): CliResult {
+  if (result.exitCode === 0 || result.outputAlreadyWritten) return result;
+  if (argv.includes('--json')) {
+    if (isJsonText(result.output)) return result;
+    return { ...result, output: cliErrorJson(result.exitCode, errorMessage(result.output)) };
+  }
+  if (result.exitCode === 1 || result.exitCode === 2) return { ...result, stream: 'stderr' };
+  return result;
+}
+
+export function cliErrorJson(exitCode: number, message: string): string {
+  return jsonOutput({
+    schemaVersion: 1,
+    status: 'error',
+    exitCode,
+    error: cliErrorKind(exitCode),
+    message
+  });
+}
+
+function cliErrorKind(exitCode: number): CliErrorKind {
+  if (exitCode === 1) return 'not-found';
+  if (exitCode === 2) return 'usage';
+  if (exitCode === 3) return 'blocked';
+  if (exitCode === 130) return 'interrupted';
+  return 'runtime';
+}
+
+function errorMessage(output: string): string {
+  const beforeUsage = output.split(/^Usage:/m, 1)[0] ?? '';
+  const line = beforeUsage.split('\n').map((value) => value.trim()).find(Boolean);
+  return line ?? 'invalid command or arguments';
+}
+
+function isJsonText(output: string): boolean {
+  try {
+    JSON.parse(output);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function routeCliCommand(argv: string[], runtime: CliRuntimeOptions): Promise<CliResult> {
   if (isRootVersionRequest(argv)) return { exitCode: 0, output: `${TOOL_VERSION}\n` };
   if (isRootHelpRequest(argv)) return { exitCode: 0, output: usageText() };
 
@@ -161,6 +221,9 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     openVisualReport: defaultOpenVisualReport,
     createPlan: defaultCreateMaintenancePlan,
     applyPlan: defaultApplyMaintenancePlan,
+    createReclaimMeasurer: defaultCreateReclaimMeasurer,
+    writeReclaimRunRecord: defaultWriteReclaimRunRecord,
+    latestReclaimRun: defaultLatestReclaimRunRecord,
     ...runtime.commands
   };
   const io = normalizeCliIo(runtime.io);
@@ -212,7 +275,10 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
       now: runtime.now ?? Date.now,
       commands: {
         runDoctor: async (options) => runGuidedDoctor(options),
-        runFixSafe: async () => commands.runFixSafe()
+        createPlan: async (action) => commands.createPlan({ action, env }),
+        applyPlan: async (planId) => commands.applyPlan({ planId, env }),
+        measurer: commands.createReclaimMeasurer(env),
+        writeRunRecord: async (record) => commands.writeReclaimRunRecord(record, env)
       }
     });
   }
@@ -234,7 +300,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     if (parsed.html) {
       return await openVisualReportForCli(
         commands.openVisualReport,
-        buildVisualReportModel(outputReport),
+        buildVisualReportModel(outputReport, { lastReclaim: await loadLastReclaim(commands, env) }),
         report.status === 'unsupported' ? 2 : 0
       );
     }
@@ -274,7 +340,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     const flagError = unknownFlagError(parsed.args.slice(1), new Set(['--safe', '--yes', '--json']), 'cursor clean');
     if (flagError) return { exitCode: 2, output: flagError };
     const result = await commands.runCursorSafeCleanup({ env, yes: parsed.args.includes('--yes') });
-    const exitCode = result.status === 'blocked' ? 3 : 0;
+    const exitCode = result.status === 'blocked' || result.status === 'partial' ? 3 : 0;
     return {
       exitCode,
       output: parsed.json ? jsonOutput(cursorCleanupJsonResult(result)) : renderCursorCleanupResult(result)
@@ -572,7 +638,7 @@ export async function routeCli(argv: string[], runtime: CliRuntimeOptions = {}):
     if (parsed.html) {
       return await openVisualReportForCli(
         commands.openVisualReport,
-        buildVisualReportModel(payload),
+        buildVisualReportModel(payload, { lastReclaim: await loadLastReclaim(commands, env) }),
         0
       );
     }
@@ -643,6 +709,18 @@ function htmlIncompatibilityError(flags: HtmlCliFlags): string | undefined {
     return HTML_INCOMPATIBILITY;
   }
   return undefined;
+}
+
+// A missing record hides the section; an unreadable one is shown as unavailable rather than silently dropped.
+async function loadLastReclaim(
+  commands: CliCommands,
+  env: NodeJS.ProcessEnv
+): Promise<ReclaimRunRecord | 'unavailable' | null> {
+  try {
+    return await commands.latestReclaimRun(env);
+  } catch {
+    return 'unavailable';
+  }
 }
 
 async function openVisualReportForCli(
@@ -901,7 +979,7 @@ function renderCursorCleanupResult(result: Awaited<ReturnType<typeof defaultRunC
     row('Mode', result.mode === 'dry-run' ? 'dry run' : 'cleanup'),
     row(result.mode === 'cleanup' ? 'Reclaimed' : 'Reclaimable', formatBytes(result.mode === 'cleanup' ? result.deletedBytes : result.reclaimableBytes)),
     row('Targets', String(result.targets.length)),
-    row('Changed', result.mode === 'cleanup' ? 'Cursor cache/log contents removed' : 'nothing; dry run only')
+    row('Changed', cursorChangedText(result))
   ];
   for (const reason of result.blockedReasons) lines.push(row('Reason', reason));
   for (const warning of result.warnings) lines.push(row('Warning', warning));
@@ -911,9 +989,23 @@ function renderCursorCleanupResult(result: Awaited<ReturnType<typeof defaultRunC
   return `${lines.join('\n')}\n`;
 }
 
-function renderPruneResult(kind: 'reports' | 'backups', result: { deleted: number; warnings: string[] }): string {
+function cursorChangedText(result: Awaited<ReturnType<typeof defaultRunCursorSafeCleanup>>): string {
+  if (result.mode !== 'cleanup') return 'nothing; dry run only';
+  if (result.status === 'partial') {
+    return result.deletedEntries > 0
+      ? 'some Cursor cache/log contents removed; some entries remain'
+      : 'nothing; every removal failed';
+  }
+  return 'Cursor cache/log contents removed';
+}
+
+function renderPruneResult(
+  kind: 'reports' | 'backups',
+  result: { deleted: number; incompleteDeleted?: number; warnings: string[] }
+): string {
   const label = kind === 'reports' ? 'Deleted reports' : 'Deleted backups';
   const lines = [`${label.padEnd(17, ' ')}${result.deleted}`];
+  if (result.incompleteDeleted) lines.push(`Abandoned temps  ${result.incompleteDeleted} (interrupted, never-validated backups)`);
   for (const warning of result.warnings) lines.push(`Warning          ${warning}`);
   return `${lines.join('\n')}\n`;
 }

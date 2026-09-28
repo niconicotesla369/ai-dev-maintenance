@@ -1,4 +1,5 @@
 import { diskLevelForCapacityPercent } from '../pressure/levels.js';
+import type { ReclaimRunRecord } from '../reclaim-run.js';
 import type {
   MaintenanceReport,
   ProviderReport,
@@ -12,6 +13,20 @@ export type VisualProviderId = 'codex' | 'claude-code' | 'cursor' | 'other';
 export type VisualDiskLevel = 'ok' | 'medium' | 'high' | 'unknown';
 export type VisualCoverage = 'complete' | 'lower-bound' | 'unavailable';
 export type VisualPlanAction = 'cursor-clean' | 'codex-fix' | 'codex-sparkle-clean';
+
+// Numbers and fixed statuses only: reasons and paths from the run record are never projected.
+export type VisualReclaimRun = {
+  finishedAt: string;
+  status: 'ok' | 'partial' | 'blocked';
+  items: Array<{
+    action: 'codex-fix' | 'cursor-clean';
+    outcome: 'ok' | 'partial' | 'blocked' | 'unknown';
+    targetDeltaBytes: number | null;
+  }>;
+  appliedTargetDeltaBytes: number | null;
+  managedStateDeltaBytes: number | null;
+  volumeDeltaBytes: number | null;
+};
 
 export type VisualReportModel = {
   generatedAt?: string;
@@ -33,6 +48,7 @@ export type VisualReportModel = {
   providers: Array<{ id: VisualProviderId; bytes: number }>;
   counts: { safe: number; review: number; protected: number };
   availablePlans: VisualPlanAction[];
+  lastReclaim?: VisualReclaimRun | 'unavailable';
 };
 
 type AggregateProjection = Pick<VisualReportModel, 'totals' | 'providers' | 'counts' | 'availablePlans'>;
@@ -43,7 +59,32 @@ const CODEX_SPARKLE_ROOT = '<home>/Library/Caches/com.openai.codex/org.sparkle-p
 const PLAN_ORDER: VisualPlanAction[] = ['cursor-clean', 'codex-fix', 'codex-sparkle-clean'];
 const PROVIDER_ORDER: VisualProviderId[] = ['codex', 'cursor', 'claude-code', 'other'];
 
-export function buildVisualReportModel(report: MaintenanceReport): VisualReportModel {
+export function buildVisualReportModel(
+  report: MaintenanceReport,
+  options: { lastReclaim?: ReclaimRunRecord | 'unavailable' | null } = {}
+): VisualReportModel {
+  const model = buildReportProjection(report);
+  if (options.lastReclaim === 'unavailable') return { ...model, lastReclaim: 'unavailable' };
+  if (options.lastReclaim) return { ...model, lastReclaim: projectReclaimRun(options.lastReclaim) };
+  return model;
+}
+
+export function projectReclaimRun(record: ReclaimRunRecord): VisualReclaimRun {
+  return {
+    finishedAt: record.finishedAt,
+    status: record.status,
+    items: record.items.map((item) => ({
+      action: item.action,
+      outcome: item.outcome,
+      targetDeltaBytes: item.target.deltaBytes
+    })),
+    appliedTargetDeltaBytes: record.totals.appliedTargetDeltaBytes,
+    managedStateDeltaBytes: record.managedState.deltaBytes,
+    volumeDeltaBytes: record.volume.deltaBytes
+  };
+}
+
+function buildReportProjection(report: MaintenanceReport): VisualReportModel {
   const generatedAt = canonicalTimestamp(report.generatedAt);
   let reportStatus = visualReportStatus(report.status);
 

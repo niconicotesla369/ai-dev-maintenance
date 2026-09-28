@@ -165,6 +165,55 @@ describe('visual report renderer', () => {
     expect(runtime.clipboardWrites).toEqual(['aidm plan cursor-clean --json']);
   });
 
+  test('omits the reclaim section when no run has been recorded', () => {
+    expect(renderVisualReportHtml(reportModel(), renderOptions())).not.toContain('id="last-reclaim"');
+  });
+
+  test('renders the latest reclaim run as signed numbers and fixed labels only', () => {
+    const html = renderVisualReportHtml({
+      ...reportModel(),
+      lastReclaim: {
+        finishedAt: '2026-09-28T14:13:34.001Z',
+        status: 'partial',
+        items: [
+          { action: 'codex-fix', outcome: 'ok', targetDeltaBytes: -53_624 },
+          { action: 'cursor-clean', outcome: 'blocked', targetDeltaBytes: 0 }
+        ],
+        appliedTargetDeltaBytes: -53_624,
+        managedStateDeltaBytes: 8_167_565,
+        volumeDeltaBytes: null
+      }
+    }, renderOptions());
+
+    expect(html).toContain('id="last-reclaim"');
+    expect(html).toContain('data-reclaim-status="partial"');
+    expect(html).toContain('data-copy="reclaimStatusPartial"');
+    expect(html).toContain('data-reclaim-action="codex-fix" data-reclaim-outcome="ok"');
+    expect(html).toContain('data-reclaim-action="cursor-clean" data-reclaim-outcome="blocked"');
+    expect(html).toContain('data-delta="-53624">-<strong data-bytes="53624">');
+    expect(html).toContain('data-delta="8167565">+<strong data-bytes="8167565">');
+    expect(html).toMatch(/id="reclaim-volume-change">.*data-copy="notMeasurable"/);
+    expect(html).toContain('data-copy="reclaimVolumeChange"');
+    expect(html).toContain('not attributed to AIDM');
+  });
+
+  test('shows an unreadable or malformed reclaim run as unavailable instead of hiding it', () => {
+    for (const lastReclaim of ['unavailable', { finishedAt: 'x', status: 'ok', items: [] }] as const) {
+      const html = renderVisualReportHtml({ ...reportModel(), lastReclaim } as VisualReportModel, renderOptions());
+
+      expect(html).toContain('id="last-reclaim"');
+      expect(html).toContain('data-copy="lastReclaimUnavailable"');
+      expect(html).not.toContain('id="reclaim-target-change"');
+    }
+  });
+
+  test('provides Japanese copy for every reclaim label', () => {
+    for (const key of Object.keys(VISUAL_REPORT_COPY.en).filter((name) => name.startsWith('reclaim') || name.startsWith('lastReclaim'))) {
+      expect(VISUAL_REPORT_COPY.ja[key as keyof typeof VISUAL_REPORT_COPY.ja]).not.toBe('');
+      expect(VISUAL_REPORT_COPY.ja[key as keyof typeof VISUAL_REPORT_COPY.ja]).not.toBe(VISUAL_REPORT_COPY.en[key as keyof typeof VISUAL_REPORT_COPY.en]);
+    }
+  });
+
   test('sends the exact same-origin close route on pagehide', () => {
     const runtime = runClient();
 

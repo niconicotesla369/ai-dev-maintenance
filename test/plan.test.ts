@@ -314,6 +314,110 @@ describe('plan/apply privacy and safety', () => {
     }
   });
 
+  test('apply reports a post-checkpoint fix failure as partial and consumes the plan', async () => {
+    const home = await makeHome();
+    try {
+      const env = { ...process.env, HOME: home };
+      const created = await createCodexFixPlan(home, 'fixpartial');
+      const first = await applyMaintenancePlan({
+        planId: created.planId,
+        env,
+        now: new Date('2026-07-04T00:01:00.000Z'),
+        runFixSafe: async () => ({
+          report: fixReport('partial', { checkpointAttempted: true }, ['checkpoint timed out; outcome unknown'])
+        })
+      });
+      const second = await applyMaintenancePlan({
+        planId: created.planId,
+        env,
+        now: new Date('2026-07-04T00:02:00.000Z'),
+        runFixSafe: async () => {
+          throw new Error('a consumed plan must not run again');
+        }
+      });
+
+      expect(first).toMatchObject({
+        status: 'partial',
+        applied: true,
+        blockedReasons: ['checkpoint timed out; outcome unknown']
+      });
+      expect(second.status).toBe('blocked');
+      expect(second.blockedReasons).toContain('plan was already applied');
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test('apply keeps a fix plan reusable when fix was blocked before any mutation', async () => {
+    const home = await makeHome();
+    try {
+      const env = { ...process.env, HOME: home };
+      const created = await createCodexFixPlan(home, 'fixblocked');
+      const first = await applyMaintenancePlan({
+        planId: created.planId,
+        env,
+        now: new Date('2026-07-04T00:01:00.000Z'),
+        runFixSafe: async () => ({
+          report: fixReport('blocked', {}, ['before backup: insufficient free space for backup'])
+        })
+      });
+      const second = await applyMaintenancePlan({
+        planId: created.planId,
+        env,
+        now: new Date('2026-07-04T00:02:00.000Z'),
+        runFixSafe: async () => ({ report: fixReport('ok', { checkpointAttempted: true }, []) })
+      });
+
+      expect(first).toMatchObject({
+        status: 'blocked',
+        applied: false,
+        blockedReasons: ['before backup: insufficient free space for backup']
+      });
+      expect(second).toMatchObject({ status: 'ok', applied: true });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['partial with deletions', 1, 'partial', true],
+    ['partial without deletions', 0, 'blocked', false]
+  ] as const)('apply classifies a Cursor %s', async (_label, deletedEntries, expectedStatus, applied) => {
+    const home = await makeHome();
+    try {
+      const env = { ...process.env, HOME: home };
+      await makeCursorCache(home, 'cache');
+      const created = await createMaintenancePlan({
+        action: 'cursor-clean',
+        env,
+        now: new Date('2026-07-04T00:00:00.000Z'),
+        randomSuffix: () => `cursor${deletedEntries}`
+      });
+
+      const result = await applyMaintenancePlan({
+        planId: created.planId,
+        env,
+        now: new Date('2026-07-04T00:01:00.000Z'),
+        runCursorSafeCleanup: async () => ({
+          ...cursorCleanupResult('ok'),
+          status: 'partial' as const,
+          mode: 'cleanup' as const,
+          deletedEntries,
+          deletedBytes: deletedEntries,
+          blockedReasons: ['some Cursor cleanup entries could not be removed']
+        })
+      });
+
+      expect(result).toMatchObject({
+        status: expectedStatus,
+        applied,
+        blockedReasons: ['some Cursor cleanup entries could not be removed']
+      });
+    } finally {
+      await rm(home, { recursive: true, force: true });
+    }
+  });
+
   test('apply blocks identity drift before running the cleanup engine', async () => {
     const home = await makeHome();
     let cleanupCalls = 0;
@@ -981,6 +1085,40 @@ async function writeSyntheticPlan(home: string, planId: string, suffix = ''): Pr
 
 async function listPlanEntries(home: string): Promise<string[]> {
   return (await readdir(path.join(home, '.ai-dev-maintenance', 'plans'))).sort();
+}
+
+async function createCodexFixPlan(home: string, suffix: string) {
+  const codexDir = path.join(home, '.codex');
+  await mkdir(codexDir, { mode: 0o700 });
+  await writeFile(path.join(codexDir, 'logs_2.sqlite'), 'sqlite', { mode: 0o600 });
+  return createMaintenancePlan({
+    action: 'codex-fix',
+    env: { ...process.env, HOME: home },
+    now: new Date('2026-07-04T00:00:00.000Z'),
+    randomSuffix: () => suffix
+  });
+}
+
+function fixReport(
+  status: 'ok' | 'partial' | 'blocked',
+  metrics: Record<string, unknown>,
+  blockedReasons: string[]
+) {
+  return {
+    schemaVersion: 1 as const,
+    toolVersion: '0.6.0',
+    generatedAt: '2026-07-04T00:01:00.000Z',
+    command: 'fix --safe',
+    status,
+    redacted: true as const,
+    target: {
+      kind: 'default-codex-log-db' as const,
+      pathCategory: '<home>/.codex/logs_2.sqlite'
+    },
+    findings: {},
+    metrics,
+    blockedReasons
+  };
 }
 
 function cursorCleanupResult(status: 'ok' | 'blocked') {

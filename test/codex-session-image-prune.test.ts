@@ -355,7 +355,7 @@ describe('pruneCodexSessionImages', () => {
 
   test.each([
     ['invalid-json', '{"message":"data:image/png;base64,' + LARGE_PAYLOAD + ' "\n'],
-    ['ambiguous-data-url', JSON.stringify({ html: '<img src=data:image/png;base64,QUFBQQ==/>' }) + '\n'],
+    ['ambiguous-data-url', '{"image_url":"data:image/png;base64,QUFB\\/QUFB"}\n'],
     ['non-json-unicode-whitespace', '\u00a0\n']
   ])('leaves a %s source unchanged and removes its failed temporary', async (_label, content) => {
     const fixture = await makeFixture([content]);
@@ -624,9 +624,10 @@ describe('pruneCodexSessionImages', () => {
   });
 
   test('preserves known placeholders while replacing only new large images', async () => {
-    const content = `${JSON.stringify({
-      text: `known ${SESSION_IMAGE_PLACEHOLDER_URL} new data:image/jpeg;base64,${LARGE_PAYLOAD} `
-    })}\n`;
+    const content = `${rolloutUserContent([
+      { type: 'input_image', image_url: SESSION_IMAGE_PLACEHOLDER_URL },
+      { type: 'input_image', image_url: `data:image/jpeg;base64,${LARGE_PAYLOAD}` }
+    ])}\n`;
     const fixture = await makeFixture([content]);
     try {
       const candidate = await makeCandidate(fixture.files[0]);
@@ -648,6 +649,41 @@ describe('pruneCodexSessionImages', () => {
       expect((await readFile(candidate.path, 'utf8')).split(SESSION_IMAGE_PLACEHOLDER_URL)).toHaveLength(3);
       const success = manifestHooks.persisted.find((record) => record.recordType === 'file-success');
       expect(success).toMatchObject({ knownPlaceholders: 1, imagesStripped: 1 });
+    } finally {
+      await fixture.cleanup();
+    }
+  });
+
+  test('commits a file whose text-embedded data URLs stay byte-identical', async () => {
+    const toolOutput = `$ cat logo.css\n.logo{background:url(data:image/png;base64,${LARGE_PAYLOAD})}\n`;
+    const pasted = `see <img src='data:image/png;base64,${LARGE_PAYLOAD}'>`;
+    const content = [
+      JSON.stringify({
+        type: 'response_item',
+        payload: { type: 'function_call_output', call_id: 'call-1', output: toolOutput }
+      }),
+      rolloutUserContent([
+        { type: 'input_text', text: pasted },
+        { type: 'input_image', image_url: `data:image/png;base64,${LARGE_PAYLOAD}` }
+      ])
+    ].join('\n') + '\n';
+    const fixture = await makeFixture([content]);
+    try {
+      const candidate = await makeCandidate(fixture.files[0]);
+      expect(candidate).toMatchObject({ occurrencesSeen: 1, imagesPrunable: 1 });
+
+      const result = await pruneCodexSessionImages({
+        env: { HOME: fixture.home },
+        planId: fixture.planId,
+        candidates: [candidate],
+        excludedOutcomes: []
+      });
+
+      expect(result, JSON.stringify(result)).toMatchObject({ status: 'ok', filesSucceeded: 1, imagesStripped: 1 });
+      const [toolLine, userLine] = (await readFile(candidate.path, 'utf8')).trimEnd().split('\n').map((line) => JSON.parse(line));
+      expect(toolLine.payload.output).toBe(toolOutput);
+      expect(userLine.payload.content[0].text).toBe(pasted);
+      expect(userLine.payload.content[1].image_url).toBe(SESSION_IMAGE_PLACEHOLDER_URL);
     } finally {
       await fixture.cleanup();
     }
@@ -684,7 +720,15 @@ async function makeFixture(contents: string[]): Promise<Fixture> {
 }
 
 function sessionLine(token: string): string {
-  return `${JSON.stringify({ message: `${token} data:image/jpeg;base64,${LARGE_PAYLOAD} after` })}\n`;
+  return `${rolloutUserContent([
+    { type: 'input_text', text: `${token} after` },
+    { type: 'input_image', image_url: `data:image/jpeg;base64,${LARGE_PAYLOAD}` }
+  ])}\n`;
+}
+
+// Rollout-shaped synthetic fixture; field names mirror Codex response items but are not captured data.
+function rolloutUserContent(content: Array<Record<string, string>>): string {
+  return JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content } });
 }
 
 async function makeCandidate(file: string): Promise<CodexSessionImageCandidate> {

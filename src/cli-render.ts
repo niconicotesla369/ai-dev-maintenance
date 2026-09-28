@@ -63,13 +63,21 @@ export function targetSizeRows(report: MaintenanceReport): string[] {
 
 export function metricRows(report: MaintenanceReport): string[] {
   const rows: string[] = [];
+  const net = report.metrics.targetNetDeltaBytes;
+  const measured = typeof net === 'number' && Number.isFinite(net);
+  // Reports with a measured net change show what actually changed; older reports keep their rows.
   for (const [key, label] of [
     ['beforeWalBytes', 'Before WAL'],
     ['afterWalBytes', 'After WAL'],
-    ['reclaimedBytes', 'Reclaimed']
+    ['reclaimedBytes', measured ? 'WAL folded' : 'Reclaimed']
   ] as const) {
     const value = report.metrics[key];
     if (typeof value === 'number' && Number.isFinite(value)) rows.push(row(label, formatMiB(value)));
+  }
+  if (measured) {
+    rows.push(row('DB+WAL change', `${net < 0 ? '-' : net > 0 ? '+' : ''}${formatMiB(Math.abs(net))}`));
+    const backup = report.metrics.backupBytes;
+    if (typeof backup === 'number' && Number.isFinite(backup)) rows.push(row('Backup kept', formatMiB(backup)));
   }
   return rows;
 }

@@ -12,8 +12,14 @@ export type RetentionOptions = {
 
 export type RetentionResult = {
   deleted: number;
+  incompleteDeleted?: number;
   warnings: string[];
 };
+
+const BACKUP_DIR_NAME = /^backup-[A-Za-z0-9]{6}$/;
+const INCOMPLETE_BACKUP_FILE = /^logs_2\.sqlite\.[0-9TZ-]+\.sqlite\.tmp$/;
+// fix caps SQLite work at 30 minutes, so an older temporary cannot belong to a running backup.
+export const INCOMPLETE_BACKUP_MIN_AGE_MS = 2 * 60 * 60 * 1000;
 
 type ResolvedRetentionOptions = {
   now?: Date;
@@ -86,9 +92,14 @@ export async function pruneBackups(
   const keepPath = options.keepPath ? path.resolve(options.keepPath) : undefined;
   const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
   const backups = [];
+  const incomplete: string[] = [];
   for (const entry of entries) {
     if (!entry.name.startsWith('backup-')) continue;
     const backupDir = path.join(dir, entry.name);
+    if (path.resolve(backupDir) !== keepPath && await isAbandonedIncompleteBackup(backupDir, entry.name, now)) {
+      incomplete.push(backupDir);
+      continue;
+    }
     const safety = await backupEntryWarnings(backupDir, entry.name);
     if (safety.length > 0) {
       warnings.push(...safety);
@@ -105,7 +116,39 @@ export async function pruneBackups(
     await rm(item.path, { recursive: true, force: false });
     deleted += 1;
   }
-  return { deleted, warnings };
+  let incompleteDeleted = 0;
+  for (const backupDir of incomplete) {
+    try {
+      await rm(backupDir, { recursive: true, force: false });
+      incompleteDeleted += 1;
+    } catch (error) {
+      warnings.push(redactPath(`incomplete backup could not be removed: ${error instanceof Error ? error.message : String(error)}`));
+    }
+  }
+  return { deleted, incompleteDeleted, warnings };
+}
+
+// Only an AIDM-named backup directory holding nothing but one never-validated temporary
+// (no manifest, never renamed) and older than any possible running fix is abandoned.
+async function isAbandonedIncompleteBackup(backupDir: string, name: string, now: Date): Promise<boolean> {
+  if (!BACKUP_DIR_NAME.test(name)) return false;
+  const uid = process.getuid?.();
+  const dirInfo = await lstat(backupDir).catch(() => undefined);
+  if (!dirInfo || !isPrivateOwned(dirInfo, uid) || !dirInfo.isDirectory()) return false;
+  const children = await readdir(backupDir).catch(() => undefined);
+  if (!children || children.length > 1) return false;
+  let newestMtimeMs = dirInfo.mtimeMs;
+  if (children.length === 1) {
+    if (!INCOMPLETE_BACKUP_FILE.test(children[0])) return false;
+    const fileInfo = await lstat(path.join(backupDir, children[0])).catch(() => undefined);
+    if (!fileInfo || !fileInfo.isFile() || fileInfo.nlink !== 1 || !isPrivateOwned(fileInfo, uid)) return false;
+    newestMtimeMs = Math.max(newestMtimeMs, fileInfo.mtimeMs);
+  }
+  return now.getTime() - newestMtimeMs >= INCOMPLETE_BACKUP_MIN_AGE_MS;
+}
+
+function isPrivateOwned(info: { isSymbolicLink(): boolean; uid: number; mode: number }, uid: number | undefined): boolean {
+  return !info.isSymbolicLink() && (uid === undefined || info.uid === uid) && (info.mode & 0o022) === 0;
 }
 
 function selectExpiredEntries<T extends { name: string; path: string; mtimeMs: number }>(

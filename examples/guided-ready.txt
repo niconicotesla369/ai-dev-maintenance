@@ -4,29 +4,48 @@
     A   A    I   D   D  M   M
     A   A   III  DDDD   M   M
       AI Dev Maintenance
+╭─ AIDM SAFE RECLAIM ──────────────────────────────────────────────────────────╮
+│ Reclaims only known, rebuildable caches and SQLite write-ahead logs.         │
+│ Always protected:                                                            │
+│   chats, session history, settings, sign-ins, workspace state, code, Git.    │
+│ Nothing changes until you approve each item.                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ AIDM ─────────────────────────────────────────────────────────────────────╮
-│ Checking whether Codex cleanup is safe...                                  │
-│ AIDM will not delete chats, rewrite history, or touch Codex while it is    │
-│ open.                                                                      │
-╰────────────────────────────────────────────────────────────────────────────╯
+Checking what can be reclaimed safely...
+╭─ WHAT CAN BE RECLAIMED ──────────────────────────────────────────────────────╮
+│ [1] Codex log database WAL  ready                                            │
+│     Estimate      none: 4.8 MiB WAL is folded into the DB, not deleted       │
+│     Why           SQLite WAL not yet folded into the Codex log DB            │
+│     Impact        private backup (~7.9 MiB) kept first; rows kept            │
+│                                                                              │
+│ [2] Cursor caches and logs  ready                                            │
+│     Estimate      439.5 KiB in 2 cache/log folders                           │
+│     Why           Cursor rebuilds its caches, VSIX cache, and logs           │
+│     Impact        Cursor must be closed; rebuilt on next launch              │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ READY TO CLEAN ───────────────────────────────────────────────────────────╮
-│ ✓ Ready to clean                                                           │
-│ Expected cleanup: WAL checkpoint/truncate only.                            │
-│ Codex is closed and no open database handles were found.                   │
-│ AIDM will create a private backup first, then run SQLite WAL               │
-│ checkpoint/truncate.                                                       │
-│ If any safety check changes, it will stop without modifying the database.  │
-╰────────────────────────────────────────────────────────────────────────────╯
+Reclaim Codex log database WAL? [y/N] y
+Reclaim Cursor caches and logs? [y/N] y
+Re-checking and reclaiming Codex log database WAL...
+  done
+Re-checking and reclaiming Cursor caches and logs...
+  stopped; nothing changed
+╭─ WHAT CHANGED ───────────────────────────────────────────────────────────────╮
+│ [1] Codex log database WAL  done                                             │
+│     Target        7.9 MiB -> 7.8 MiB (-52.4 KiB)                             │
+│ [2] Cursor caches and logs  stopped; nothing changed                         │
+│     Target        439.5 KiB -> 439.5 KiB (0 B)                               │
+│     Reason        Cursor is running                                          │
+│                                                                              │
+│ Applied items   1 (not counted: 1)                                           │
+│ Target change   -52.4 KiB                                                    │
+│ Managed state   8.9 MiB -> 16.7 MiB (+7.8 MiB)                               │
+│ Volume free     41.0 GiB -> 41.0 GiB (-7.9 MiB)                              │
+│                                                                              │
+│ Target change: logical size of applied items only.                           │
+│ Managed state: targets plus AIDM backups, reports, and plans.                │
+│ Volume free: whole volume; not attributed to AIDM.                           │
+│ Saved           <home>/.ai-dev-maintenance/reclaim-runs/<run>.json           │
+│ View            aidm report --latest --html                                  │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ Target ───────────────────────────────────────────────────────────────────╮
-│ <home>/.codex/logs_2.sqlite                                                │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Database ─────────────────────────────────────────────────────────────────╮
-│ Main DB         46.7 MiB                                                    │
-│ WAL             5.2 MiB                                                     │
-│ SHM             0.0 MiB                                                     │
-╰────────────────────────────────────────────────────────────────────────────╯
-
-Clean now? [y/N]

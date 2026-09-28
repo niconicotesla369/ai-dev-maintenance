@@ -40,7 +40,7 @@ describe('fix safe scope', () => {
 
   test('runs checkpoint once in fix safe implementation', async () => {
     const source = await readFile('src/fix.ts', 'utf8');
-    const callCount = source.match(/await runCheckpoint\(sqlite, dbUri\);/g)?.length ?? 0;
+    const callCount = source.match(/await runCheckpoint\(sqlite, dbUri,/g)?.length ?? 0;
 
     expect(callCount).toBe(1);
   });

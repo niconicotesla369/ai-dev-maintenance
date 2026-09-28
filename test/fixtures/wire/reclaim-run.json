@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "0.6.0",
+  "command": "reclaim-run",
+  "runId": "2026-09-28T14-13-32-347Z-1a2b3c4d",
+  "startedAt": "2026-09-28T14:13:32.347Z",
+  "finishedAt": "2026-09-28T14:13:34.001Z",
+  "status": "partial",
+  "units": "bytes",
+  "items": [
+    {
+      "action": "codex-fix",
+      "outcome": "ok",
+      "estimateBytes": null,
+      "estimateNote": "wal-folds-into-database",
+      "target": { "beforeBytes": 8274296, "afterBytes": 8220672, "deltaBytes": -53624 },
+      "reasons": []
+    },
+    {
+      "action": "cursor-clean",
+      "outcome": "blocked",
+      "estimateBytes": 620000,
+      "target": { "beforeBytes": 620000, "afterBytes": 620000, "deltaBytes": 0 },
+      "reasons": ["Cursor is running"]
+    }
+  ],
+  "totals": { "appliedItems": 1, "excludedItems": 1, "appliedTargetDeltaBytes": -53624 },
+  "managedState": { "beforeBytes": 8894296, "afterBytes": 17061861, "deltaBytes": 8167565 },
+  "volume": { "beforeBytes": 42764242944, "afterBytes": null, "deltaBytes": null, "attributedToAidm": false }
+}

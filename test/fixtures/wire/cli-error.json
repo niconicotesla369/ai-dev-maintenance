@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "status": "error",
+  "exitCode": 1,
+  "error": "not-found",
+  "message": "No report found."
+}

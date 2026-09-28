@@ -51,6 +51,14 @@ const schemaCases = [
   {
     schemaPath: 'schemas/trust-report.v1.schema.json',
     fixturePath: 'test/fixtures/wire/trust-json.json'
+  },
+  {
+    schemaPath: 'schemas/reclaim-run.v1.schema.json',
+    fixturePath: 'test/fixtures/wire/reclaim-run.json'
+  },
+  {
+    schemaPath: 'schemas/cli-error.v1.schema.json',
+    fixturePath: 'test/fixtures/wire/cli-error.json'
   }
 ] as const;
 

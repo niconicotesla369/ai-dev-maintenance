@@ -4,37 +4,30 @@
     A   A    I   D   D  M   M
     A   A   III  DDDD   M   M
       AI Dev Maintenance
+╭─ AIDM SAFE RECLAIM ──────────────────────────────────────────────────────────╮
+│ Reclaims only known, rebuildable caches and SQLite write-ahead logs.         │
+│ Always protected:                                                            │
+│   chats, session history, settings, sign-ins, workspace state, code, Git.    │
+│ Nothing changes until you approve each item.                                 │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ AIDM ─────────────────────────────────────────────────────────────────────╮
-│ Checking whether Codex cleanup is safe...                                  │
-│ AIDM will not delete chats, rewrite history, or touch Codex while it is    │
-│ open.                                                                      │
-╰────────────────────────────────────────────────────────────────────────────╯
+Checking what can be reclaimed safely...
+╭─ WHAT CAN BE RECLAIMED ──────────────────────────────────────────────────────╮
+│ [1] Codex log database WAL  paused for safety                                │
+│     Estimate      none: 4.8 MiB WAL is folded into the DB, not deleted       │
+│     Why           SQLite WAL not yet folded into the Codex log DB            │
+│     Impact        private backup (~7.9 MiB) kept first; rows kept            │
+│     Reason        target database is open by a process                       │
+│                                                                              │
+│ [2] Cursor caches and logs  nothing to reclaim                               │
+│     Nothing to remove: Cursor caches and logs are empty or absent.           │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ SAFE MAINTENANCE CHECK ──────────────────────────────────────────────────╮
-│ ✓ Checked. Safe. Nothing deleted.                                          │
-│                                                                            │
-│ Paused for safety                                                          │
-│ Codex is using the log database. Cleanup is paused.                        │
-│ Codex is still open, so AIDM will not clean anything yet.                  │
-│ Nothing was changed except a redacted local report.                        │
-╰────────────────────────────────────────────────────────────────────────────╯
+Nothing can be reclaimed right now. Nothing was changed.
+╭─ What do you want to do? ────────────────────────────────────────────────────╮
+│ [1] Re-check    Check again now                                              │
+│ [2] Quit        Exit AIDM                                                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
 
-╭─ Target ───────────────────────────────────────────────────────────────────╮
-│ <home>/.codex/logs_2.sqlite                                                │
-│ Reason: target database is open by a process                               │
-╰────────────────────────────────────────────────────────────────────────────╯
-╭─ Database ─────────────────────────────────────────────────────────────────╮
-│ Main DB         46.7 MiB                                                    │
-│ WAL             5.2 MiB                                                     │
-│ SHM             0.0 MiB                                                     │
-╰────────────────────────────────────────────────────────────────────────────╯
-WAL is SQLite temporary log storage; SHM is SQLite sidecar metadata.
-
-╭─ What do you want to do? ──────────────────────────────────────────────────╮
-│ [1] Wait        Check again later                                          │
-│ [2] Re-check    Run safety check again now                                 │
-│ [3] Report      Show report command                                        │
-│ [4] Quit        Exit AIDM                                                   │
-╰────────────────────────────────────────────────────────────────────────────╯
-Choose [1-4]:
+Choose [1-2]: 2
+No cleanup was run.

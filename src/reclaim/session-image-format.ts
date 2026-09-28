@@ -24,7 +24,8 @@ export type SessionImageOccurrence =
         | 'invalid-padding'
         | 'non-canonical-base64'
         | 'unsafe-terminator'
-        | 'missing-terminator';
+        | 'missing-terminator'
+        | 'unverifiable-context';
     };
 
 export type SessionImageLineAnalysis = {
@@ -39,7 +40,10 @@ const MIME_CHAR = /^[A-Za-z0-9.+-]$/;
 const BASE64_CHAR = /^[A-Za-z0-9+/=]$/;
 const VALID_PADDING = /^[A-Za-z0-9+/]*={0,2}$/;
 const SAFE_TERMINATORS = new Set(['"', "'", '\\', ')', ' ', '\t', '\n', '.', '…']);
+const STANDALONE_DATA_URL_VALUE = /^data:image\/[A-Za-z0-9.+-]{1,32};base64,[A-Za-z0-9+/=]*$/;
 
+// Only JSON string values that are exactly one base64 image data URL are images;
+// data URLs embedded in text (tool output, pasted code, markdown) are conversation content.
 export function analyzeSessionImageLine(
   line: string,
   minPayloadChars = MIN_SESSION_IMAGE_PAYLOAD_CHARS
@@ -48,19 +52,28 @@ export function analyzeSessionImageLine(
   let blocked = false;
   let searchFrom = 0;
 
+  const firstMarker = line.indexOf(IMAGE_MARKER);
+  // `\u` escapes can spell an image value without a literal marker, so such lines are parsed too.
+  if (firstMarker === -1 && !line.includes('\\u')) return freezeAnalysis(line, occurrences, false);
+  const blockedStart = Math.max(firstMarker, 0);
+  const blockedEnd = firstMarker === -1 ? 0 : firstMarker + IMAGE_MARKER.length;
+
+  let expectedStandalone: number;
+  try {
+    expectedStandalone = countStandaloneDataUrlValues(JSON.parse(line));
+  } catch {
+    if (firstMarker === -1) return freezeAnalysis(line, occurrences, false);
+    occurrences.push({ kind: 'blocked', start: blockedStart, end: blockedEnd, reason: 'unverifiable-context' });
+    return freezeAnalysis(line, occurrences, true);
+  }
+  let standaloneSeen = 0;
+
   while (searchFrom < line.length) {
     const start = line.indexOf(IMAGE_MARKER, searchFrom);
     if (start === -1) break;
 
     const prefix = parseDataUrlPrefix(line, start);
     if (!prefix) {
-      occurrences.push({
-        kind: 'blocked',
-        start,
-        end: start + IMAGE_MARKER.length,
-        reason: 'invalid-alphabet'
-      });
-      blocked = true;
       searchFrom = start + IMAGE_MARKER.length;
       continue;
     }
@@ -69,6 +82,12 @@ export function analyzeSessionImageLine(
     while (end < line.length && BASE64_CHAR.test(line[end])) end += 1;
     const payload = line.slice(prefix.payloadStart, end);
     const next = line[end];
+
+    if (!isStandaloneJsonStringValue(line, start, end)) {
+      searchFrom = Math.max(end, start + IMAGE_MARKER.length);
+      continue;
+    }
+    standaloneSeen += 1;
 
     let occurrence: SessionImageOccurrence;
     if (payload === SESSION_IMAGE_PLACEHOLDER_PAYLOAD) {
@@ -97,12 +116,54 @@ export function analyzeSessionImageLine(
     if (next === undefined) break;
   }
 
+  // Escaped standalone values (e.g. `\/`, `d`) parse as images but cannot be located safely.
+  if (standaloneSeen !== expectedStandalone) {
+    occurrences.push({ kind: 'blocked', start: blockedStart, end: blockedEnd, reason: 'unverifiable-context' });
+    blocked = true;
+  }
+
+  return freezeAnalysis(line, occurrences, blocked);
+}
+
+function freezeAnalysis(
+  line: string,
+  occurrences: SessionImageOccurrence[],
+  blocked: boolean
+): SessionImageLineAnalysis {
   for (const occurrence of occurrences) Object.freeze(occurrence);
   Object.freeze(occurrences);
   const analysis: SessionImageLineAnalysis = { occurrences, blocked };
   Object.freeze(analysis);
   ANALYZED_LINE_BY_RESULT.set(analysis, line);
   return analysis;
+}
+
+function isStandaloneJsonStringValue(line: string, start: number, end: number): boolean {
+  const opening = start - 1;
+  if (opening < 0 || line[opening] !== '"') return false;
+  let backslashes = 0;
+  for (let cursor = opening - 1; cursor >= 0 && line[cursor] === '\\'; cursor -= 1) backslashes += 1;
+  if (backslashes % 2 !== 0) return false;
+  if (line[end] !== '"') return false;
+  let cursor = end + 1;
+  while (cursor < line.length && /\s/.test(line[cursor])) cursor += 1;
+  return line[cursor] !== ':';
+}
+
+function countStandaloneDataUrlValues(root: unknown): number {
+  let count = 0;
+  const stack: unknown[] = [root];
+  while (stack.length > 0) {
+    const value = stack.pop();
+    if (typeof value === 'string') {
+      if (STANDALONE_DATA_URL_VALUE.test(value)) count += 1;
+    } else if (Array.isArray(value)) {
+      for (const item of value) stack.push(item);
+    } else if (value !== null && typeof value === 'object') {
+      for (const item of Object.values(value)) stack.push(item);
+    }
+  }
+  return count;
 }
 
 export function rewriteSessionImageLine(

@@ -5,10 +5,17 @@
 ## 0.6.0 - 2026-08-26
 
 - Add the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.
-- Add explicit, content-reading Codex session-image estimates and CLI-only, irreversible image-prune plans requiring `--yes --accept-image-loss`; pruning is never unattended and writes private manifests for recovery evidence.
+- Add explicit, content-reading Codex session-image estimates and CLI-only, irreversible image-prune plans requiring `--yes --accept-image-loss`; pruning is never unattended and writes private audit manifests (hashes and counts only; removed images cannot be restored from them).
 - Add advisory native-compression status without reading or changing Codex configuration, and conditional cleanup for only the exact Codex Sparkle `Installation/*` cache.
 - Add an opt-in metadata-only Codex session monitor with private local state, explicit LaunchAgent install/remove plans, best-effort notifications, and path-move reinstall guidance.
 - Preserve `doctor` as metadata-only, keep the new actions unavailable through MCP, and report logical reclaimed bytes separately from non-guaranteed volume-free deltas.
+- Replace the guided `aidm` flow with an approval-per-item reclaim flow for the Codex log-database write-ahead log and Cursor caches/logs. Each item shows an estimate, reason, and impact; approved items are revalidated through `plan` / `apply` immediately before running; results separate target change, managed-state change, and unattributed volume change, and one private `reclaim-run.v1` record per run is shown by `aidm report --latest --html`.
+- Fix session-image pruning so only JSON values that are exactly a base64 image data URL are replaced; data URLs embedded in tool output, pasted code, or text are no longer rewritten.
+- `fix --safe` now checks free space before its backup, records backup failures as blocked reports, reports any failure after the checkpoint starts as `partial`, and scales SQLite timeouts with database size.
+- `cursor clean --safe --yes` reports failed removals as `partial` and exits with code 3; `plan` / `apply` no longer restores a plan whose engine already changed files.
+- Commands run with `--json` now print a `cli-error.v1` JSON object on stdout when they fail before producing their own JSON; human usage and not-found errors go to stderr.
+- `backups prune --yes` and post-fix retention remove provably abandoned, never-validated backup temporaries and report them as `incompleteDeleted`.
+- `fix --safe` human output labels folded WAL as `WAL folded` and shows the measured `DB+WAL change` and `Backup kept`; JSON keeps `reclaimedBytes` for compatibility and adds `targetNetDeltaBytes` and `backupBytes`.
 
 ## 0.5.0 - 2026-08-24
 

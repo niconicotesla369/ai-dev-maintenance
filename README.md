@@ -41,7 +41,7 @@ aidm plan codex-session-monitor-remove
 aidm apply --plan <planId> --yes
 ```
 
-Image pruning is **irreversible and CLI-only**: it is never scheduled or exposed through MCP, requires the exact matching plan plus both confirmations, and has no unattended deletion. It supports only default `$HOME/.codex`, inactive plain `*.jsonl`, and files that pass every revalidation; custom `CODEX_HOME` (anything other than `$HOME/.codex`) and `.jsonl.zst` are unsupported and block the action. A recovery manifest with manifest mode `0600` is written to `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl`. A legacy anonymous placeholder is **not auditable from files alone**, so it is not attributed to AIDM.
+Image pruning is **irreversible and CLI-only**: it is never scheduled or exposed through MCP, requires the exact matching plan plus both confirmations, and has no unattended deletion. It supports only default `$HOME/.codex`, inactive plain `*.jsonl`, and files that pass every revalidation; custom `CODEX_HOME` (anything other than `$HOME/.codex`) and `.jsonl.zst` are unsupported and block the action. A recovery manifest with manifest mode `0600` is written to `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl`. A legacy anonymous placeholder is **not auditable from files alone**, so it is not attributed to AIDM. Only JSON string values that are exactly one base64 image data URL are replaced; data URLs embedded in text such as tool output, pasted code, CSS, HTML, or Markdown stay byte-identical, and an image value hidden by JSON escapes blocks the file. The manifest records hashes and counts for audit; it does not contain the removed images, so they cannot be restored from it.
 
 Successful apply reports logical `Reclaimed` bytes and, when measurable, the human `Free-space delta`; JSON uses `volumeFreeDeltaBytes`. They are distinct measurements: APFS accounting and concurrent writes mean free-space equality is not guaranteed. A global preflight failure changes nothing; a post-mutation failure returns `partial` and consumes the plan, leaving stable manifest evidence. No universal compression ratio, including `104x`, is promised.
 
@@ -61,7 +61,7 @@ In addition to the metadata-only file-size scan, `doctor` uses `statfs` for meta
 
 Aggregate JSON remains schema v2 for compatibility, including `totals.totalBytes`. This wording change does not alter cleanup scope, cleanup engines, or action gates: human aggregate output calls the value `Tracked state` rather than total local AI-tool state.
 
-The Cursor cleanup path is opt-in. `cursor clean --safe` is a dry run, and `cursor clean --safe --yes` removes only Cursor `Cache`, `CachedData`, `CachedExtensionVSIXs`, and `logs` contents. It does not touch `state.vscdb`, `state.vscdb.backup`, `workspaceStorage`, settings, auth, or conversation history.
+The Cursor cleanup path is opt-in. `cursor clean --safe` is a dry run, and `cursor clean --safe --yes` removes only Cursor `Cache`, `CachedData`, `CachedExtensionVSIXs`, and `logs` contents. It does not touch `state.vscdb`, `state.vscdb.backup`, `workspaceStorage`, settings, auth, or conversation history. If any entry cannot be removed, the result is `partial` and the command exits with code 3.
 
 The existing Codex-only `fix --safe --yes` path remains available for SQLite WAL checkpoint/truncate. It creates a private local backup that may contain Codex log data before touching the Codex log database.
 
@@ -83,7 +83,9 @@ Run the guided local check:
 npx --yes ai-dev-maintenance@0.6.0
 ```
 
-In a normal terminal this starts the guided Codex cleanup flow. It diagnoses first, explains whether cleanup is safe, and asks before running `fix --safe`.
+In a normal terminal this starts the guided reclaim flow. It diagnoses first, lists each candidate (the Codex log-database write-ahead log and Cursor caches/logs) with an estimate, the reason it is reclaimable, and its impact, and asks you to approve each item separately. Approved items are re-checked immediately before they run, and the result shows measured before/after sizes. Chats and session history, settings, sign-in data, workspace state, source code, and Git data are never candidates; session-image pruning and Sparkle cleanup are never offered in this flow.
+
+The guided result separates four measurements: the pre-run estimate, the logical size change of the applied targets, the net change of all managed state (targets plus AIDM backups, reports, and plans), and the observed volume free-space change, which is never attributed to AIDM. Blocked and unknown results are not counted, and a value that cannot be measured is shown as not measurable rather than zero. The Codex write-ahead log has no estimate because checkpointing folds it into the database instead of deleting it; the measured net change is usually much smaller than the write-ahead log size, and the private backup adds to managed state. Each approved run writes one private record under `<home>/.ai-dev-maintenance/reclaim-runs/` (the newest 20 are kept), and `aidm report --latest --html` shows the latest one.
 `doctor` is a read-only multi-tool report for Codex, Claude Code, and Cursor.
 
 Pinned safety-first diagnosis:
@@ -107,7 +109,7 @@ npm install -g ai-dev-maintenance@0.6.0
 aidm
 ```
 
-If the target log database is still open, the guided flow pauses for safety. You can close the tool yourself and choose the wait option; `ai-dev-maintenance` will not force close, kill, restart, or modify Codex while it is open.
+If the target log database is still open, the Codex item is paused for safety. Close the tool yourself and choose Re-check, or start with `--wait`; `ai-dev-maintenance` will not force close, kill, restart, or modify Codex while it is open.
 
 Manual commands are still available:
 
@@ -236,6 +238,10 @@ MCP requests are handled serially. A long local diagnosis can delay later respon
 | `1` | Requested local data was not found, such as `report --latest` before any report exists, or an unexpected runtime error occurred. |
 | `2` | Usage error, unsupported platform, invalid flag, or invalid argument. |
 | `3` | The requested safe action was blocked, unsafe to run, `trust` found an untrusted allowlist command, or the command completed with warnings that need review. |
+
+With `--json`, a command that fails before producing its own JSON result prints a `cli-error.v1` object on stdout (`{"schemaVersion":1,"status":"error","exitCode":2,"error":"usage","message":"..."}`) instead of human text, so scripts can always parse stdout. Without `--json`, usage (`2`) and not-found (`1`) messages go to stderr.
+
+`backups prune --yes` (and the retention step after a successful `fix --safe --yes`) also removes an interrupted backup only when it is provably abandoned: an AIDM-named `backup-*` directory that holds nothing but one never-validated `.sqlite.tmp` (no manifest), is private to you, and is older than two hours, beyond any running `fix`. JSON reports these as `incompleteDeleted`.
 
 ## Safety Guarantees
 

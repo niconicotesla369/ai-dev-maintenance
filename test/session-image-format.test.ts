@@ -9,10 +9,12 @@ import {
 } from '../src/reclaim/session-image-format.js';
 
 const SMALL_PAYLOAD = 'QUFB';
+const LARGE_PAYLOAD = Buffer.alloc(900, 7).toString('base64');
 const EXPECTED_PLACEHOLDER_PAYLOAD =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAHnRFWHRDb21tZW50AGFpZG0tc3RyaXBwZWQtaW1hZ2UtdjEFNd5PAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
 const EXPECTED_PLACEHOLDER_URL =
   'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAHnRFWHRDb21tZW50AGFpZG0tc3RyaXBwZWQtaW1hZ2UtdjEFNd5PAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=';
+const IMAGE_VALUE_PREFIX = '{"type":"input_image","image_url":"';
 
 describe('session image placeholder', () => {
   test('is the exact identifiable v1 transparent PNG', () => {
@@ -42,148 +44,125 @@ describe('session image placeholder', () => {
 });
 
 describe('analyzeSessionImageLine', () => {
-  test('blocks a self-closing slash consumed by a greedy base64 candidate', () => {
-    const line = '<img src=data:image/png;base64,QUFBQQ==/>';
-    const analysis = analyzeSessionImageLine(line);
-
-    expect(analysis.blocked).toBe(true);
-    expect(analysis.occurrences).toContainEqual(expect.objectContaining({
-      kind: 'blocked',
-      reason: 'invalid-padding'
-    }));
-  });
-
-  test('skips the exact versioned placeholder before applying the size threshold', () => {
-    const analysis = analyzeSessionImageLine(SESSION_IMAGE_PLACEHOLDER_URL);
-
-    expect(analysis).toMatchObject({
-      blocked: false,
-      occurrences: [{ kind: 'skip', reason: 'known-placeholder' }]
-    });
-  });
-
-  test('keeps exact-placeholder precedence before unsupported escaping checks', () => {
-    const analysis = analyzeSessionImageLine(`${SESSION_IMAGE_PLACEHOLDER_URL}\\/`);
-
-    expect(analysis).toMatchObject({
-      blocked: false,
-      occurrences: [{ kind: 'skip', reason: 'known-placeholder' }]
-    });
-  });
-
-  test.each([
-    ['double quote', '"'],
-    ['single quote', "'"],
-    ['escaped quote backslash', '\\'],
-    ['right parenthesis', ')'],
-    ['space', ' '],
-    ['tab', '\t'],
-    ['newline', '\n'],
-    ['period', '.'],
-    ['ellipsis', '…']
-  ])('accepts the approved %s terminator', (_name, terminator) => {
-    const line = `before:data:image/jpeg;base64,${SMALL_PAYLOAD}${terminator}after`;
-    const analysis = analyzeSessionImageLine(line, SMALL_PAYLOAD.length);
+  test('replaces a data URL that is the entire JSON string value', () => {
+    const url = `data:image/png;base64,${SMALL_PAYLOAD}`;
+    const analysis = analyzeSessionImageLine(imageValue(url), SMALL_PAYLOAD.length);
 
     expect(analysis).toEqual({
       blocked: false,
       occurrences: [{
         kind: 'replace',
-        start: 'before:'.length,
-        end: 'before:'.length + `data:image/jpeg;base64,${SMALL_PAYLOAD}`.length,
+        start: IMAGE_VALUE_PREFIX.length,
+        end: IMAGE_VALUE_PREFIX.length + url.length,
         payloadChars: SMALL_PAYLOAD.length,
-        mime: 'jpeg'
+        mime: 'png'
       }]
     });
   });
 
-  test('blocks a missing terminator for a non-placeholder payload', () => {
-    const analysis = analyzeSessionImageLine(
-      `data:image/png;base64,${SMALL_PAYLOAD}`,
-      SMALL_PAYLOAD.length
-    );
-
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'missing-terminator' }]
-    });
+  test.each([
+    ['tool output CSS', rolloutToolOutput(`$ cat app.css\n.logo{background:url(data:image/png;base64,${LARGE_PAYLOAD})}\n`)],
+    ['pasted markdown', rolloutUserText(`fix this: ![x](data:image/png;base64,${LARGE_PAYLOAD}) please`)],
+    ['single-quoted HTML', rolloutToolOutput(`<img src='data:image/png;base64,${LARGE_PAYLOAD}'>`)],
+    ['prose', rolloutUserText(`data:image/png;base64,${LARGE_PAYLOAD} is the logo`)],
+    ['quoted inside text', rolloutUserText(`say "data:image/png;base64,${LARGE_PAYLOAD}" now`)]
+  ])('ignores a data URL embedded in %s', (_name, line) => {
+    expect(analyzeSessionImageLine(line)).toEqual({ occurrences: [], blocked: false });
   });
 
-  test('blocks a payload whose length is not divisible by four', () => {
-    const analysis = analyzeSessionImageLine('data:image/png;base64,QUF"', 1);
+  test('does not treat an object key as an image', () => {
+    const line = JSON.stringify({ [`data:image/png;base64,${LARGE_PAYLOAD}`]: 'x' });
 
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-length' }]
-    });
+    expect(analyzeSessionImageLine(line)).toEqual({ occurrences: [], blocked: false });
   });
 
-  test('blocks padding before the end of a payload', () => {
-    const analysis = analyzeSessionImageLine('data:image/png;base64,QU=F"', 1);
+  test('replaces only the standalone value when text and image share a line', () => {
+    const line = rolloutUserContent([
+      { type: 'input_text', text: `css: url(data:image/png;base64,${LARGE_PAYLOAD})` },
+      { type: 'input_image', image_url: `data:image/jpeg;base64,${LARGE_PAYLOAD}` }
+    ]);
+    const analysis = analyzeSessionImageLine(line);
 
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-padding' }]
-    });
+    expect(analysis.blocked).toBe(false);
+    expect(analysis.occurrences).toEqual([
+      expect.objectContaining({ kind: 'replace', mime: 'jpeg', payloadChars: LARGE_PAYLOAD.length })
+    ]);
   });
 
-  test('blocks non-canonical base64 decoding', () => {
-    const analysis = analyzeSessionImageLine('data:image/png;base64,Zh=="', 1);
-
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'non-canonical-base64' }]
-    });
-  });
-
-  test('blocks a URL-safe base64 alphabet character', () => {
-    const analysis = analyzeSessionImageLine('data:image/png;base64,QUFB_"', 1);
-
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-alphabet' }]
-    });
-  });
-
-  test('blocks unsupported escaped slashes in a payload', () => {
-    const analysis = analyzeSessionImageLine('data:image/png;base64,QUFB\\/"', 1);
-
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-alphabet' }]
-    });
-  });
-
-  test('blocks a valid payload followed by an unsafe terminator', () => {
-    const analysis = analyzeSessionImageLine(`data:image/png;base64,${SMALL_PAYLOAD}>`, 1);
-
-    expect(analysis).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'unsafe-terminator' }]
+  test('skips the exact versioned placeholder before applying the size threshold', () => {
+    expect(analyzeSessionImageLine(imageValue(SESSION_IMAGE_PLACEHOLDER_URL))).toMatchObject({
+      blocked: false,
+      occurrences: [{ kind: 'skip', reason: 'known-placeholder' }]
     });
   });
 
   test('skips a canonical payload below the configured minimum', () => {
-    const analysis = analyzeSessionImageLine(
-      `data:image/png;base64,${SMALL_PAYLOAD}"`,
-      SMALL_PAYLOAD.length + 1
-    );
+    const line = imageValue(`data:image/png;base64,${SMALL_PAYLOAD}`);
 
-    expect(analysis).toMatchObject({
+    expect(analyzeSessionImageLine(line, SMALL_PAYLOAD.length + 1)).toMatchObject({
       blocked: false,
       occurrences: [{ kind: 'skip', reason: 'below-min-payload' }]
     });
   });
 
-  test('finds multiple images in occurrence order', () => {
-    const line = [
-      `a:data:image/png;base64,${SMALL_PAYLOAD}"`,
-      `b:data:image/jpeg;base64,QkJC'`
-    ].join('|');
+  test.each([
+    ['invalid-length', 'QUF'],
+    ['invalid-padding', 'QU=F'],
+    ['non-canonical-base64', 'Zh==']
+  ])('blocks a standalone value with %s', (reason, payload) => {
+    expect(analyzeSessionImageLine(imageValue(`data:image/png;base64,${payload}`), 1)).toMatchObject({
+      blocked: true,
+      occurrences: [{ kind: 'blocked', reason }]
+    });
+  });
+
+  test.each([
+    ['URL-safe alphabet', `data:image/png;base64,${SMALL_PAYLOAD}_`],
+    ['non-base64 encoding', 'data:image/svg+xml;utf8,<svg/>'],
+    ['empty MIME', `data:image/;base64,${SMALL_PAYLOAD}`],
+    ['base32 marker', `data:image/png;base32,${SMALL_PAYLOAD}`],
+    ['33-character MIME', `data:image/${'a'.repeat(33)};base64,${SMALL_PAYLOAD}`]
+  ])('ignores a value that is not a base64 image data URL: %s', (_name, url) => {
+    expect(analyzeSessionImageLine(imageValue(url), 1)).toEqual({ occurrences: [], blocked: false });
+  });
+
+  test('accepts a 32-character MIME', () => {
+    const mime = 'a'.repeat(32);
+
+    expect(analyzeSessionImageLine(imageValue(`data:image/${mime};base64,${SMALL_PAYLOAD}`), 4)).toMatchObject({
+      blocked: false,
+      occurrences: [{ kind: 'replace', mime }]
+    });
+  });
+
+  test.each([
+    ['escaped slash', '{"image_url":"data:image/png;base64,QUFB\\/QUFB"}'],
+    ['unicode-escaped marker', '{"image_url":"\\u0064ata:image/png;base64,QUFB"}']
+  ])('blocks a standalone image value hidden by a JSON %s', (_name, line) => {
+    const analysis = analyzeSessionImageLine(line, 1);
+
+    expect(analysis.blocked).toBe(true);
+    expect(analysis.occurrences).toContainEqual(expect.objectContaining({
+      kind: 'blocked',
+      reason: 'unverifiable-context'
+    }));
+  });
+
+  test('blocks a line with an image marker that cannot be parsed as JSON', () => {
+    expect(analyzeSessionImageLine(`not json "data:image/png;base64,${SMALL_PAYLOAD}"`, 1)).toMatchObject({
+      blocked: true,
+      occurrences: [{ kind: 'blocked', reason: 'unverifiable-context' }]
+    });
+  });
+
+  test('finds multiple standalone images in document order', () => {
+    const line = rolloutUserContent([
+      { type: 'input_image', image_url: `data:image/png;base64,${SMALL_PAYLOAD}` },
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,QkJC' }
+    ]);
     const analysis = analyzeSessionImageLine(line, SMALL_PAYLOAD.length);
 
     expect(analysis.blocked).toBe(false);
-    expect(analysis.occurrences).toHaveLength(2);
     expect(analysis.occurrences).toEqual([
       expect.objectContaining({ kind: 'replace', mime: 'png', payloadChars: 4 }),
       expect.objectContaining({ kind: 'replace', mime: 'jpeg', payloadChars: 4 })
@@ -196,70 +175,42 @@ describe('analyzeSessionImageLine', () => {
       blocked: false
     });
   });
-
-  test('accepts a 32-character MIME and blocks a longer MIME', () => {
-    const boundedMime = 'a'.repeat(32);
-    const tooLongMime = 'a'.repeat(33);
-
-    expect(
-      analyzeSessionImageLine(`data:image/${boundedMime};base64,${SMALL_PAYLOAD}"`, 4)
-    ).toMatchObject({
-      blocked: false,
-      occurrences: [{ kind: 'replace', mime: boundedMime }]
-    });
-    expect(
-      analyzeSessionImageLine(`data:image/${tooLongMime};base64,${SMALL_PAYLOAD}"`, 4)
-    ).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-alphabet' }]
-    });
-  });
-
-  test.each([
-    'data:image/;base64,QUFB"',
-    'data:image/png_svg;base64,QUFB"',
-    'data:image/png;base32,QUFB"'
-  ])('blocks a malformed image prefix: %s', (line) => {
-    expect(analyzeSessionImageLine(line, 4)).toMatchObject({
-      blocked: true,
-      occurrences: [{ kind: 'blocked', reason: 'invalid-alphabet' }]
-    });
-  });
 });
 
 describe('rewriteSessionImageLine', () => {
-  test('preserves all surrounding text and approved terminators', () => {
-    const line = `前:data:image/jpeg;base64,${SMALL_PAYLOAD}'後`;
-    const analysis = analyzeSessionImageLine(line, SMALL_PAYLOAD.length);
+  test('replaces the standalone value and keeps the line valid JSON', () => {
+    const line = rolloutUserContent([
+      { type: 'input_image', image_url: `data:image/png;base64,${LARGE_PAYLOAD}` }
+    ]);
+    const rewritten = rewriteSessionImageLine(line, analyzeSessionImageLine(line));
 
-    expect(rewriteSessionImageLine(line, analysis)).toEqual({
-      output: `前:${SESSION_IMAGE_PLACEHOLDER_URL}'後`,
+    expect(rewritten).toEqual({
+      output: rolloutUserContent([{ type: 'input_image', image_url: SESSION_IMAGE_PLACEHOLDER_URL }]),
       imagesStripped: 1,
       knownPlaceholders: 0,
       skippedSmall: 0
     });
+    expect(() => JSON.parse(rewritten.output)).not.toThrow();
   });
 
-  test('rewrites multiple approved spans without changing text between them', () => {
-    const line = [
-      `a:data:image/png;base64,${SMALL_PAYLOAD}"`,
-      `b:data:image/jpeg;base64,QkJC'`
-    ].join('|');
-    const analysis = analyzeSessionImageLine(line, SMALL_PAYLOAD.length);
+  test('leaves text-embedded data URLs byte-identical while replacing a standalone image', () => {
+    const text = `$ cat logo.css\n.logo{background:url(data:image/png;base64,${LARGE_PAYLOAD})}`;
+    const line = rolloutUserContent([
+      { type: 'input_text', text },
+      { type: 'input_image', image_url: `data:image/png;base64,${LARGE_PAYLOAD}` }
+    ]);
 
-    expect(rewriteSessionImageLine(line, analysis)).toEqual({
-      output: `a:${SESSION_IMAGE_PLACEHOLDER_URL}"|b:${SESSION_IMAGE_PLACEHOLDER_URL}'`,
-      imagesStripped: 2,
-      knownPlaceholders: 0,
-      skippedSmall: 0
-    });
+    expect(rewriteSessionImageLine(line, analyzeSessionImageLine(line)).output).toBe(rolloutUserContent([
+      { type: 'input_text', text },
+      { type: 'input_image', image_url: SESSION_IMAGE_PLACEHOLDER_URL }
+    ]));
   });
 
-  test('does not rewrite any span when one occurrence is blocked', () => {
-    const line = [
-      `ok:data:image/png;base64,${SMALL_PAYLOAD}"`,
-      'bad:data:image/png;base64,QUFBQQ==/>'
-    ].join('|');
+  test('does not rewrite any span when one standalone occurrence is blocked', () => {
+    const line = rolloutUserContent([
+      { type: 'input_image', image_url: `data:image/png;base64,${SMALL_PAYLOAD}` },
+      { type: 'input_image', image_url: 'data:image/png;base64,QU=F' }
+    ]);
     const analysis = analyzeSessionImageLine(line, SMALL_PAYLOAD.length);
 
     expect(analysis.occurrences).toEqual([
@@ -275,7 +226,10 @@ describe('rewriteSessionImageLine', () => {
   });
 
   test('reports known and below-minimum skips without changing the line', () => {
-    const line = `${SESSION_IMAGE_PLACEHOLDER_URL}|data:image/png;base64,${SMALL_PAYLOAD}"`;
+    const line = rolloutUserContent([
+      { type: 'input_image', image_url: SESSION_IMAGE_PLACEHOLDER_URL },
+      { type: 'input_image', image_url: `data:image/png;base64,${SMALL_PAYLOAD}` }
+    ]);
     const analysis = analyzeSessionImageLine(line, 8);
 
     expect(rewriteSessionImageLine(line, analysis)).toEqual({
@@ -319,7 +273,7 @@ describe('rewriteSessionImageLine', () => {
   });
 
   test('rejects an authentic analysis when it is used with a different line', () => {
-    const source = `data:image/png;base64,${SMALL_PAYLOAD}"`;
+    const source = imageValue(`data:image/png;base64,${SMALL_PAYLOAD}`);
     const analysis = analyzeSessionImageLine(source, SMALL_PAYLOAD.length);
     const differentLine = 'different private text';
 
@@ -333,7 +287,7 @@ describe('rewriteSessionImageLine', () => {
 
   test('returns immutable analyzer-owned results', () => {
     const analysis = analyzeSessionImageLine(
-      `data:image/png;base64,${SMALL_PAYLOAD}"`,
+      imageValue(`data:image/png;base64,${SMALL_PAYLOAD}`),
       SMALL_PAYLOAD.length
     );
 
@@ -342,6 +296,26 @@ describe('rewriteSessionImageLine', () => {
     expect(analysis.occurrences.every((occurrence) => Object.isFrozen(occurrence))).toBe(true);
   });
 });
+
+// Rollout-shaped synthetic fixtures; field names mirror Codex response items but are not captured data.
+function imageValue(url: string): string {
+  return JSON.stringify({ type: 'input_image', image_url: url });
+}
+
+function rolloutUserContent(content: Array<Record<string, string>>): string {
+  return JSON.stringify({ type: 'response_item', payload: { type: 'message', role: 'user', content } });
+}
+
+function rolloutUserText(text: string): string {
+  return rolloutUserContent([{ type: 'input_text', text }]);
+}
+
+function rolloutToolOutput(output: string): string {
+  return JSON.stringify({
+    type: 'response_item',
+    payload: { type: 'function_call_output', call_id: 'call-1', output }
+  });
+}
 
 function parsePngChunks(png: Buffer): Array<{ type: string; data: Buffer; crcValid: boolean }> {
   const chunks: Array<{ type: string; data: Buffer; crcValid: boolean }> = [];

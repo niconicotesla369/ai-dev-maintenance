@@ -113,6 +113,39 @@ describe('report and backup retention', () => {
     }
   });
 
+  test('removes only abandoned, never-validated backup temporaries older than any running fix', async () => {
+    const dir = await makePrivateDir('aidm-backups-incomplete-');
+    const now = new Date('2026-02-15T12:00:00.000Z');
+    const old = new Date('2026-02-15T09:00:00.000Z');
+    const recent = new Date('2026-02-15T11:30:00.000Z');
+    const tmpName = 'logs_2.sqlite.2026-02-15T09-00-00-000Z.sqlite.tmp';
+    try {
+      await makeIncomplete(path.join(dir, 'backup-Abc123'), tmpName, old);
+      await makeIncomplete(path.join(dir, 'backup-Empty1'), undefined, old);
+      await makeIncomplete(path.join(dir, 'backup-Recent'), tmpName, recent);
+      await makeIncomplete(path.join(dir, 'backup-Keep01'), tmpName, old);
+      await makeIncomplete(path.join(dir, 'backup-Other1'), 'unrelated.tmp', old);
+      await makeIncomplete(path.join(dir, 'backup-GroupW'), tmpName, old, 0o770);
+      await makeIncomplete(path.join(dir, 'backup-custom-name'), tmpName, old);
+      await makeIncomplete(path.join(dir, 'backup-Extra1'), tmpName, old);
+      await writeFile(path.join(dir, 'backup-Extra1', 'notes.txt'), 'x', { mode: 0o600 });
+      await touch(path.join(dir, 'backup-Extra1'), old);
+
+      const result = await pruneBackups(dir, { now, keepPath: path.join(dir, 'backup-Keep01') });
+      const entries = await readdir(dir);
+
+      expect(result.incompleteDeleted).toBe(2);
+      expect(entries).not.toContain('backup-Abc123');
+      expect(entries).not.toContain('backup-Empty1');
+      for (const kept of ['backup-Recent', 'backup-Keep01', 'backup-Other1', 'backup-GroupW', 'backup-custom-name', 'backup-Extra1']) {
+        expect(entries).toContain(kept);
+      }
+    } finally {
+      await chmod(path.join(dir, 'backup-GroupW'), 0o700).catch(() => undefined);
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   test('does not delete unsafe symlink backup entries', async () => {
     const dir = await makePrivateDir('aidm-backups-unsafe-');
     const target = await makePrivateDir('aidm-backups-target-');
@@ -196,6 +229,16 @@ async function makeBackupDir(dir: string): Promise<void> {
   await mkdir(dir, { mode: 0o700 });
   await writeFile(path.join(dir, 'logs_2.sqlite.2026.sqlite'), 'sqlite\n', { mode: 0o600 });
   await writeFile(path.join(dir, 'logs_2.sqlite.2026.sqlite.manifest.json'), '{}\n', { mode: 0o600 });
+}
+
+async function makeIncomplete(dir: string, fileName: string | undefined, mtime: Date, mode = 0o700): Promise<void> {
+  await mkdir(dir, { mode: 0o700 });
+  if (fileName) {
+    await writeFile(path.join(dir, fileName), 'partial', { mode: 0o600 });
+    await touch(path.join(dir, fileName), mtime);
+  }
+  await touch(dir, mtime);
+  await chmod(dir, mode);
 }
 
 async function touch(file: string, date: Date): Promise<void> {

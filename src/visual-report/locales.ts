@@ -48,7 +48,23 @@ const en = {
   providerOther: 'Other AI tools',
   planCursorClean: 'aidm plan cursor-clean --json',
   planCodexFix: 'aidm plan codex-fix --json',
-  planCodexSparkle: 'aidm plan codex-sparkle-clean --json'
+  planCodexSparkle: 'aidm plan codex-sparkle-clean --json',
+  lastReclaimHeading: 'Latest approved reclaim',
+  lastReclaimUnavailable: 'The latest reclaim record could not be read safely.',
+  reclaimCodexFix: 'Codex log database WAL',
+  reclaimCursorClean: 'Cursor caches and logs',
+  reclaimStatusOk: 'Done',
+  reclaimStatusPartial: 'Partially done',
+  reclaimStatusBlocked: 'Stopped; nothing changed',
+  reclaimOutcomeOk: 'done',
+  reclaimOutcomePartial: 'partially done',
+  reclaimOutcomeBlocked: 'stopped; nothing changed',
+  reclaimOutcomeUnknown: 'result unknown',
+  reclaimTargetChange: 'Target change (applied items only)',
+  reclaimManagedChange: 'Managed state change (targets + AIDM backups, reports, plans)',
+  reclaimVolumeChange: 'Volume free-space change (whole volume; not attributed to AIDM)',
+  reclaimMeasureNote: 'Negative values are reductions. Blocked and unknown results are never counted.',
+  notMeasurable: 'Not measurable'
 } as const;
 
 export type VisualReportCopyKey = keyof typeof en;
@@ -102,7 +118,23 @@ const ja: VisualReportCopy = {
   providerOther: 'その他のAIツール',
   planCursorClean: 'aidm plan cursor-clean --json',
   planCodexFix: 'aidm plan codex-fix --json',
-  planCodexSparkle: 'aidm plan codex-sparkle-clean --json'
+  planCodexSparkle: 'aidm plan codex-sparkle-clean --json',
+  lastReclaimHeading: '直近の承認済み回収',
+  lastReclaimUnavailable: '直近の回収記録を安全に読み取れませんでした。',
+  reclaimCodexFix: 'Codexログデータベース WAL',
+  reclaimCursorClean: 'Cursorのキャッシュとログ',
+  reclaimStatusOk: '完了',
+  reclaimStatusPartial: '一部完了',
+  reclaimStatusBlocked: '停止（変更なし）',
+  reclaimOutcomeOk: '完了',
+  reclaimOutcomePartial: '一部完了',
+  reclaimOutcomeBlocked: '停止（変更なし）',
+  reclaimOutcomeUnknown: '結果不明',
+  reclaimTargetChange: '対象の増減（実行された項目のみ）',
+  reclaimManagedChange: '管理対象全体の増減（対象＋AIDMのバックアップ・レポート・プラン）',
+  reclaimVolumeChange: 'ボリューム空き容量の変化（ボリューム全体の観測値。AIDMの成果とは断定しない）',
+  reclaimMeasureNote: 'マイナスは減少を示します。停止・結果不明の項目は集計に含めません。',
+  notMeasurable: '測定不能'
 };
 
 export const VISUAL_REPORT_COPY: Record<VisualReportLocale, VisualReportCopy> = {

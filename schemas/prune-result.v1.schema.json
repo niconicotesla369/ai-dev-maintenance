@@ -20,6 +20,11 @@
       "type": "number",
       "minimum": 0
     },
+    "incompleteDeleted": {
+      "description": "Abandoned, never-validated AIDM backup temporaries removed (backups only).",
+      "type": "number",
+      "minimum": 0
+    },
     "warnings": {
       "type": "array",
       "items": {

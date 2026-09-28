@@ -109,6 +109,34 @@ describe('human CLI output', () => {
     expect(output).not.toContain('not a doctor report');
   });
 
+  test('labels folded WAL honestly and shows the measured net change and backup when recorded', () => {
+    const output = renderReport({
+      schemaVersion: 1,
+      toolVersion: '0.6.0',
+      generatedAt: '2026-09-29T00:00:00.000Z',
+      command: 'fix --safe',
+      status: 'ok',
+      redacted: true,
+      target: { kind: 'default-codex-log-db', pathCategory: '<home>/.codex/logs_2.sqlite' },
+      findings: {},
+      metrics: {
+        beforeWalBytes: 801_706_712,
+        afterWalBytes: 0,
+        reclaimedBytes: 801_706_712,
+        beforeMainBytes: 48_930_816,
+        afterMainBytes: 797_044_736,
+        targetNetDeltaBytes: -53_592_792,
+        backupBytes: 797_044_736
+      },
+      blockedReasons: []
+    });
+
+    expect(output).toContain('WAL folded      764.6 MiB');
+    expect(output).toContain('DB+WAL change   -51.1 MiB');
+    expect(output).toContain('Backup kept     760.1 MiB');
+    expect(output).not.toContain('Reclaimed');
+  });
+
   test('suppresses banner for JSON, CI, NO_COLOR, no-banner flag, and non-TTY output', () => {
     expect(shouldShowBanner({ json: true, noBanner: false, ci: false, noColor: false, isTty: true })).toBe(false);
     expect(shouldShowBanner({ json: false, noBanner: true, ci: false, noColor: false, isTty: true })).toBe(false);

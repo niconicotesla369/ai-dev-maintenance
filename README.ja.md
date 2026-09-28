@@ -41,7 +41,7 @@ aidm plan codex-session-monitor-remove
 aidm apply --plan <planId> --yes
 ```
 
-画像pruneは `不可逆かつCLI限定` です。scheduleやMCPからは実行できず、matching private planと両方のconfirmationが必要です。unattended deletionはありません。default `$HOME/.codex` 配下のinactiveなplain `*.jsonl`で、再検証に合格したfileだけを対象にします。custom `CODEX_HOME`（`$HOME/.codex` 以外）と `.jsonl.zst` はunsupportedでblockします。manifest mode `0600` のrecovery manifestは `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl` に書き込みます。legacy anonymous placeholderは `ファイルだけから監査できません`。そのためAIDMのものとは扱いません。
+画像pruneは `不可逆かつCLI限定` です。scheduleやMCPからは実行できず、matching private planと両方のconfirmationが必要です。unattended deletionはありません。default `$HOME/.codex` 配下のinactiveなplain `*.jsonl`で、再検証に合格したfileだけを対象にします。custom `CODEX_HOME`（`$HOME/.codex` 以外）と `.jsonl.zst` はunsupportedでblockします。manifest mode `0600` のrecovery manifestは `<home>/.ai-dev-maintenance/manifests/session-image-<planId>.jsonl` に書き込みます。legacy anonymous placeholderは `ファイルだけから監査できません`。そのためAIDMのものとは扱いません。置き換えるのは、JSON文字列の値そのものが1つのbase64画像data URLである場合だけです。ツール出力、貼り付けたコード、CSS、HTML、Markdownなどのテキストに埋め込まれたdata URLはバイト単位で変更しません。JSONエスケープで書かれた画像値を含むfileはblockします。manifestは監査用のhashと件数だけを記録し、削除した画像は含まないため、manifestから画像を復元することはできません。
 
 成功時はlogical `Reclaimed` bytesと、測定できる場合はhuman labelの `Free-space delta` を表示し、JSONは `volumeFreeDeltaBytes` を使います。APFS accountingや同時writeのためfree-space equalityは保証しません。global preflight failureなら変更しません。post-mutation failureは `partial` となりplanを消費します。manifestにはstableなevidenceを残します。universalなcompression ratio（`104x`を含む）は約束しません。
 
@@ -87,7 +87,7 @@ metadata-onlyなファイルサイズscanに加え、`doctor` は `statfs` でme
 
 aggregate JSONは互換性のためschema v2のままで、`totals.totalBytes` も維持します。この表現変更でcleanup scope、cleanup engine、action gateは変わりません。人間向けaggregate出力では、合計使用量ではなく `Tracked state` を表示します。
 
-Cursor cleanup は明示実行だけです。`cursor clean --safe` はdry-run、`cursor clean --safe --yes` はCursorの `Cache`、`CachedData`、`CachedExtensionVSIXs`、`logs` の中身だけを削除します。`state.vscdb`、`state.vscdb.backup`、`workspaceStorage`、設定、認証情報、会話履歴には触りません。
+Cursor cleanup は明示実行だけです。`cursor clean --safe` はdry-run、`cursor clean --safe --yes` はCursorの `Cache`、`CachedData`、`CachedExtensionVSIXs`、`logs` の中身だけを削除します。`state.vscdb`、`state.vscdb.backup`、`workspaceStorage`、設定、認証情報、会話履歴には触りません。削除できない項目が1つでもあれば結果は `partial` になり、exit code 3で終了します。
 
 既存のCodex専用 `fix --safe --yes` は残っています。これはCodexログデータを含む可能性がある非公開のローカルバックアップを作成してから、CodexログDBのSQLite WAL領域だけを整理します。
 
@@ -109,7 +109,9 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 npx --yes ai-dev-maintenance@0.6.0
 ```
 
-通常のターミナルでは対話式のCodex cleanupフローとして起動します。最初に診断し、cleanupできる状態かを説明し、実行前に必ず確認します。
+通常のターミナルでは対話式の回収フローとして起動します。最初に診断し、回収候補（CodexログDBのwrite-ahead logと、Cursorのcache/log）ごとに見込み容量・回収できる理由・影響を表示して、項目ごとに承認を求めます。承認した項目は実行直前に再検証し、結果として実測のBefore/Afterを表示します。会話・session履歴、設定、認証情報、workspace state、ソースコード、Gitデータは候補になりません。session画像pruneとSparkle cleanupはこのフローでは提示しません。
+
+結果は4つの計測を区別して表示します。実行前の見込み、実行した対象の論理サイズの増減、管理対象全体（対象＋AIDMのバックアップ・レポート・プラン）の純増減、ボリューム空き容量の観測差分です。ボリュームの差分はAIDMの成果とは断定しません。停止・結果不明の項目は集計に含めず、測定できない値は0ではなく「測定不能」と表示します。Codexのwrite-ahead logはcheckpointで削除されずにDB本体へ統合されるため見込みを出しません。実測の純減はwrite-ahead logのサイズよりずっと小さいことが多く、private backupの分だけ管理対象は増えます。承認した実行ごとに `<home>/.ai-dev-maintenance/reclaim-runs/` へprivateな記録を1件書き込み（最新20件を保持）、`aidm report --latest --html` で最新の結果を表示できます。
 `doctor` はCodex / Claude Code / Cursorの横断read-onlyレポートです。
 
 安全重視の固定版:
@@ -133,7 +135,7 @@ npm install -g ai-dev-maintenance@0.6.0
 aidm
 ```
 
-CodexなどのAIコーディングツールを開いたままでも診断はできます。ただし対象DBを開いているprocessがある場合、cleanupは安全のためpausedになります。利用者が自分で対象ツールを閉じてから、waitを選ぶと再確認できます。このツールがCodexを強制終了、kill、restart、変更することはありません。
+CodexなどのAIコーディングツールを開いたままでも診断はできます。ただし対象DBを開いているprocessがある場合、Codexの項目は安全のためpausedになります。利用者が自分で対象ツールを閉じてからRe-checkを選ぶか、`--wait` 付きで起動すると再確認できます。このツールがCodexを強制終了、kill、restart、変更することはありません。
 
 手動コマンドも使えます。
 
@@ -260,6 +262,10 @@ MCP requestは直列処理です。重いローカル診断中は、同じsessio
 | `1` | `report --latest` のように要求されたローカルデータがまだ存在しない場合、または unexpected runtime error が発生した場合。 |
 | `2` | usage error、unsupported platform、不正なflag、不正なargument。 |
 | `3` | safe action が blocked、実行が安全ではない、`trust` が信頼できないallowlist commandを検出した、または確認すべきwarning付きで完了した場合。 |
+
+`--json` 付きのコマンドが、自身のJSON結果を出す前に失敗した場合は、人間向けの文ではなく `cli-error.v1` のobject（`{"schemaVersion":1,"status":"error","exitCode":2,"error":"usage","message":"..."}`）をstdoutに出します。これにより、scriptは常にstdoutをJSONとして読めます。`--json` なしの場合、使い方の誤り（`2`）と「見つからない」（`1`）のメッセージはstderrに出ます。
+
+`backups prune --yes`（および `fix --safe --yes` 成功後の保持処理）は、中断されたbackupを、放棄されたことを確認できる場合に限り削除します。条件は、AIDMの命名の `backup-*` ディレクトリであること、中身が検証前の `.sqlite.tmp` 1つだけ（manifestなし）であること、自分専用の権限であること、実行中の `fix` ではありえない2時間以上前のものであることです。JSONでは `incompleteDeleted` として報告します。
 
 ## 安全方針
 

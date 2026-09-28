@@ -67,6 +67,66 @@ describe('visual report CLI routing', () => {
     expect(result).toEqual({ exitCode: 0, output: GRACEFUL_OUTPUT });
   });
 
+  test('report --latest --html projects the latest reclaim run without reasons', async () => {
+    let openedModel: VisualReportModel | undefined;
+    const reason = `blocked near ${LEAK}`;
+
+    await runCli(['report', '--latest', '--html'], runtime({
+      latestReclaimRun: async () => ({
+        schemaVersion: 1,
+        toolVersion: '0.6.0',
+        command: 'reclaim-run',
+        runId: '2026-09-28T14-13-32-347Z-1a2b3c4d',
+        startedAt: '2026-09-28T14:13:32.347Z',
+        finishedAt: '2026-09-28T14:13:34.001Z',
+        status: 'partial',
+        units: 'bytes',
+        items: [{
+          action: 'cursor-clean',
+          outcome: 'partial',
+          estimateBytes: 620_000,
+          target: { beforeBytes: 620_000, afterBytes: 70_000, deltaBytes: -550_000 },
+          reasons: [reason]
+        }],
+        totals: { appliedItems: 1, excludedItems: 0, appliedTargetDeltaBytes: -550_000 },
+        managedState: { beforeBytes: 621_000, afterBytes: 71_500, deltaBytes: -549_500 },
+        volume: { beforeBytes: 10, afterBytes: 20, deltaBytes: 10, attributedToAidm: false }
+      }),
+      openVisualReport: async (model) => {
+        openedModel = model;
+        return 'page-close';
+      }
+    }));
+
+    expect(openedModel?.lastReclaim).toEqual({
+      finishedAt: '2026-09-28T14:13:34.001Z',
+      status: 'partial',
+      items: [{ action: 'cursor-clean', outcome: 'partial', targetDeltaBytes: -550_000 }],
+      appliedTargetDeltaBytes: -550_000,
+      managedStateDeltaBytes: -549_500,
+      volumeDeltaBytes: 10
+    });
+    expect(JSON.stringify(openedModel)).not.toContain(LEAK);
+  });
+
+  test('doctor --html marks an unreadable reclaim record as unavailable instead of failing or hiding it', async () => {
+    let openedModel: VisualReportModel | undefined;
+
+    const result = await runCli(['doctor', '--html'], runtime({
+      latestReclaimRun: async () => {
+        throw new Error(`unsafe reclaim run record at ${LEAK}`);
+      },
+      openVisualReport: async (model) => {
+        openedModel = model;
+        return 'page-close';
+      }
+    }));
+
+    expect(result.exitCode).toBe(0);
+    expect(openedModel?.lastReclaim).toBe('unavailable');
+    expect(JSON.stringify(openedModel)).not.toContain(LEAK);
+  });
+
   test('report --latest --html preserves the no-report result without opening a browser', async () => {
     const calls: string[] = [];
     const result = await runCli(['report', '--latest', '--html'], runtime({
@@ -80,7 +140,7 @@ describe('visual report CLI routing', () => {
       }
     }));
 
-    expect(result).toEqual({ exitCode: 1, output: 'No report found.\n' });
+    expect(result).toEqual({ exitCode: 1, output: 'No report found.\n', stream: 'stderr' });
     expect(calls).toEqual(['latestReport']);
   });
 
@@ -109,9 +169,10 @@ describe('visual report CLI routing', () => {
     'doctor --html rejects %s before diagnosis or launch',
     async (flag) => {
       const calls: string[] = [];
-      const result = await runCli(['doctor', '--html', flag], commandsThatMustNotRun(calls));
+      const argv = ['doctor', '--html', flag];
+      const result = await runCli(argv, commandsThatMustNotRun(calls));
 
-      expect(result).toEqual({ exitCode: 2, output: HTML_INCOMPATIBILITY });
+      expectIncompatibility(result, argv);
       expect(calls).toEqual([]);
     }
   );
@@ -120,21 +181,20 @@ describe('visual report CLI routing', () => {
     'report --latest --html rejects %s before report loading or launch',
     async (flag) => {
       const calls: string[] = [];
-      const result = await runCli(['report', '--latest', '--html', flag], commandsThatMustNotRun(calls));
+      const argv = ['report', '--latest', '--html', flag];
+      const result = await runCli(argv, commandsThatMustNotRun(calls));
 
-      expect(result).toEqual({ exitCode: 2, output: HTML_INCOMPATIBILITY });
+      expectIncompatibility(result, argv);
       expect(calls).toEqual([]);
     }
   );
 
   test('the fixed HTML diagnostic wins when a named conflict and an unrelated flag coexist', async () => {
     const calls: string[] = [];
-    const result = await runCli(
-      ['report', '--latest', '--html', '--json', '--browser'],
-      commandsThatMustNotRun(calls)
-    );
+    const argv = ['report', '--latest', '--html', '--json', '--browser'];
+    const result = await runCli(argv, commandsThatMustNotRun(calls));
 
-    expect(result).toEqual({ exitCode: 2, output: HTML_INCOMPATIBILITY });
+    expectIncompatibility(result, argv);
     expect(calls).toEqual([]);
   });
 
@@ -145,7 +205,7 @@ describe('visual report CLI routing', () => {
     const calls: string[] = [];
     const result = await runCli(argv, commandsThatMustNotRun(calls));
 
-    expect(result).toEqual({ exitCode: 2, output: HTML_INCOMPATIBILITY });
+    expectIncompatibility(result, argv);
     expect(calls).toEqual([]);
   });
 
@@ -181,7 +241,7 @@ describe('visual report CLI routing', () => {
         providers: [],
         availablePlans: []
       });
-      expect(result).toEqual({ exitCode: 2, output: GRACEFUL_OUTPUT });
+      expect(result).toEqual({ exitCode: 2, output: GRACEFUL_OUTPUT, stream: 'stderr' });
     }
   );
 
@@ -250,9 +310,26 @@ function runtime(
     commands: {
       runDoctor: async () => ({ report: aggregateReport() }),
       latestReport: async () => ({ path: LEAK, report: aggregateReport() }),
+      latestReclaimRun: async () => null,
       ...commands
     }
   };
+}
+
+// --json callers get the JSON error contract; everyone else gets the fixed text on stderr.
+function expectIncompatibility(result: { exitCode: number; output: string; stream?: string }, argv: string[]): void {
+  if (argv.includes('--json')) {
+    expect(result.exitCode).toBe(2);
+    expect(JSON.parse(result.output)).toEqual({
+      schemaVersion: 1,
+      status: 'error',
+      exitCode: 2,
+      error: 'usage',
+      message: HTML_INCOMPATIBILITY.trim()
+    });
+    return;
+  }
+  expect(result).toEqual({ exitCode: 2, output: HTML_INCOMPATIBILITY, stream: 'stderr' });
 }
 
 function commandsThatMustNotRun(calls: string[]): CliRuntimeOptions {

@@ -5,6 +5,7 @@ import type {
   VisualCoverage,
   VisualPlanAction,
   VisualProviderId,
+  VisualReclaimRun,
   VisualReportModel
 } from './model.js';
 import { VISUAL_REPORT_STYLES } from './styles.js';
@@ -148,6 +149,8 @@ export function renderVisualReportHtml(
           <p class="paths-hidden" data-copy="pathsHidden">${escapeHtml(copy.pathsHidden)}</p>
         </section>
       </div>
+
+      ${lastReclaimSection(normalizeLastReclaim(model.lastReclaim))}
 
       <section id="privacy-proof" class="privacy-proof" aria-labelledby="privacy-heading">
         <h2 id="privacy-heading" class="visually-hidden" data-copy="pathsHidden">${escapeHtml(copy.pathsHidden)}</h2>
@@ -369,6 +372,82 @@ function planList(plans: VisualPlanAction[]): string {
     const command = VISUAL_REPORT_COPY.en[key];
     return `<li class="plan-row" data-plan="${plan}"><code>${escapeHtml(command)}</code><button class="copy-button" type="button" data-plan-copy="${plan}" data-copy="copyCommand">${escapeHtml(VISUAL_REPORT_COPY.en.copyCommand)}</button></li>`;
   }).join('')}</ul>`;
+}
+
+const RECLAIM_ACTION_COPY = { 'codex-fix': 'reclaimCodexFix', 'cursor-clean': 'reclaimCursorClean' } as const;
+const RECLAIM_STATUS_COPY = { ok: 'reclaimStatusOk', partial: 'reclaimStatusPartial', blocked: 'reclaimStatusBlocked' } as const;
+const RECLAIM_OUTCOME_COPY = {
+  ok: 'reclaimOutcomeOk',
+  partial: 'reclaimOutcomePartial',
+  blocked: 'reclaimOutcomeBlocked',
+  unknown: 'reclaimOutcomeUnknown'
+} as const;
+
+function normalizeLastReclaim(value: unknown): VisualReclaimRun | 'unavailable' | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'unavailable' || typeof value !== 'object' || value === null) return 'unavailable';
+  const run = value as Record<string, unknown>;
+  const finishedAt = canonicalTimestamp(run.finishedAt);
+  if (finishedAt === undefined || !isKey(RECLAIM_STATUS_COPY, run.status) || !Array.isArray(run.items)) return 'unavailable';
+  const items: VisualReclaimRun['items'] = [];
+  for (const item of run.items as unknown[]) {
+    const entry = item as Record<string, unknown> | null;
+    if (!entry || !isKey(RECLAIM_ACTION_COPY, entry.action) || !isKey(RECLAIM_OUTCOME_COPY, entry.outcome)) return 'unavailable';
+    if (!isDelta(entry.targetDeltaBytes)) return 'unavailable';
+    items.push({ action: entry.action, outcome: entry.outcome, targetDeltaBytes: entry.targetDeltaBytes });
+  }
+  if (!isDelta(run.appliedTargetDeltaBytes) || !isDelta(run.managedStateDeltaBytes) || !isDelta(run.volumeDeltaBytes)) {
+    return 'unavailable';
+  }
+  return {
+    finishedAt,
+    status: run.status,
+    items,
+    appliedTargetDeltaBytes: run.appliedTargetDeltaBytes,
+    managedStateDeltaBytes: run.managedStateDeltaBytes,
+    volumeDeltaBytes: run.volumeDeltaBytes
+  };
+}
+
+function lastReclaimSection(run: VisualReclaimRun | 'unavailable' | undefined): string {
+  if (run === undefined) return '';
+  const copy = VISUAL_REPORT_COPY.en;
+  const heading = `<h2 id="last-reclaim-heading" class="section-heading" data-copy="lastReclaimHeading">${escapeHtml(copy.lastReclaimHeading)}</h2>`;
+  if (run === 'unavailable') {
+    return `<section id="last-reclaim" class="provider-panel" aria-labelledby="last-reclaim-heading">${heading}<p class="inline-status" data-copy="lastReclaimUnavailable">${escapeHtml(copy.lastReclaimUnavailable)}</p></section>`;
+  }
+  const statusKey = RECLAIM_STATUS_COPY[run.status];
+  const rows = run.items.map((item) => {
+    const actionKey = RECLAIM_ACTION_COPY[item.action];
+    const outcomeKey = RECLAIM_OUTCOME_COPY[item.outcome];
+    return `<li class="provider-row" data-reclaim-action="${item.action}" data-reclaim-outcome="${item.outcome}"><span data-copy="${actionKey}">${escapeHtml(copy[actionKey])}</span><span data-copy="${outcomeKey}">${escapeHtml(copy[outcomeKey])}</span>${signedByteSpan(item.targetDeltaBytes)}</li>`;
+  }).join('\n');
+  return `<section id="last-reclaim" class="provider-panel" aria-labelledby="last-reclaim-heading" data-reclaim-status="${run.status}">
+        ${heading}
+        <p class="muted"><span data-copy="${statusKey}">${escapeHtml(copy[statusKey])}</span> · <time datetime="${run.finishedAt}" data-timestamp="${run.finishedAt}">${formatDateEn(run.finishedAt)}</time></p>
+        <ul class="provider-list">
+          ${rows}
+        </ul>
+        <div class="provider-total" id="reclaim-target-change"><span data-copy="reclaimTargetChange">${escapeHtml(copy.reclaimTargetChange)}</span>${signedByteSpan(run.appliedTargetDeltaBytes)}</div>
+        <div class="provider-total" id="reclaim-managed-change"><span data-copy="reclaimManagedChange">${escapeHtml(copy.reclaimManagedChange)}</span>${signedByteSpan(run.managedStateDeltaBytes)}</div>
+        <div class="provider-total" id="reclaim-volume-change"><span data-copy="reclaimVolumeChange">${escapeHtml(copy.reclaimVolumeChange)}</span>${signedByteSpan(run.volumeDeltaBytes)}</div>
+        <p class="paths-hidden" data-copy="reclaimMeasureNote">${escapeHtml(copy.reclaimMeasureNote)}</p>
+      </section>`;
+}
+
+// The sign sits outside the data-bytes element because the client re-renders that element's text.
+function signedByteSpan(bytes: number | null): string {
+  if (bytes === null) return `<strong data-copy="notMeasurable">${escapeHtml(VISUAL_REPORT_COPY.en.notMeasurable)}</strong>`;
+  const sign = bytes < 0 ? '-' : bytes > 0 ? '+' : '';
+  return `<span class="signed-bytes" data-delta="${bytes}">${sign}${byteSpan(Math.abs(bytes))}</span>`;
+}
+
+function isKey<T extends Record<string, string>>(table: T, value: unknown): value is keyof T & string {
+  return typeof value === 'string' && Object.hasOwn(table, value);
+}
+
+function isDelta(value: unknown): value is number | null {
+  return value === null || Number.isSafeInteger(value);
 }
 
 function privacyItem(copyKey: string, label: string): string {

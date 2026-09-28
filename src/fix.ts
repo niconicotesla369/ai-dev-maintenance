@@ -1,4 +1,4 @@
-import { chmod, mkdtemp, rename, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, rename, rm, stat, statfs, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { trustedCommandPath, runCommand } from './commands.js';
 import { assertDirectoryChainSafe, compareTargetIdentities, detectTargetState, safeTargetStateForReport } from './fs-safety.js';
@@ -10,6 +10,13 @@ import { checkOpenHandles, knownCodexProcessExists } from './doctor.js';
 import { pruneBackups } from './retention.js';
 import type { MaintenanceReport } from './types.js';
 import { REPORT_SCHEMA_VERSION, TOOL_VERSION } from './version.js';
+
+const BACKUP_HEADROOM_BYTES = 64 * 1024 * 1024;
+const MIN_BACKUP_TIMEOUT_MS = 60_000;
+const MIN_CHECKPOINT_TIMEOUT_MS = 10_000;
+const MAX_SQLITE_TIMEOUT_MS = 30 * 60_000;
+// Conservative 20 MiB/s so large databases get proportionally longer timeouts.
+const ASSUMED_SQLITE_BYTES_PER_MS = (20 * 1024 * 1024) / 1000;
 
 export async function runFixSafe(options: {
   platform?: NodeJS.Platform;
@@ -60,7 +67,33 @@ export async function runFixSafe(options: {
     report.blockedReasons.push(...beforeBackup.blockers.map((reason) => `before backup: ${reason}`));
     return { report, reportPath: await writeReport(report) };
   }
-  const backup = await createBackup(mainPath);
+  const sourceBytes = Number(beforeBackup.findings.targetState?.main?.size ?? 0)
+    + Number(beforeBackup.findings.targetState?.wal?.size ?? 0);
+  const requiredBackupBytes = sourceBytes + BACKUP_HEADROOM_BYTES;
+  const availableBackupBytes = await availableBytesNear(appDataHome());
+  report.metrics.backupRequiredBytes = requiredBackupBytes;
+  if (availableBackupBytes === undefined) {
+    report.status = 'blocked';
+    report.blockedReasons.push('before backup: free-space check unavailable');
+    return { report, reportPath: await writeReport(report) };
+  }
+  report.metrics.backupAvailableBytes = availableBackupBytes;
+  if (availableBackupBytes < requiredBackupBytes) {
+    report.status = 'blocked';
+    report.blockedReasons.push('before backup: insufficient free space for backup');
+    report.nextSafeAction = 'Nothing was changed. Free disk space, then run doctor again.';
+    return { report, reportPath: await writeReport(report) };
+  }
+
+  let backup: Awaited<ReturnType<typeof createBackup>>;
+  try {
+    backup = await createBackup(mainPath, scaledTimeoutMs(sourceBytes, MIN_BACKUP_TIMEOUT_MS));
+  } catch (error) {
+    report.status = 'blocked';
+    report.blockedReasons.push(`backup: ${redactPath(error instanceof Error ? error.message : String(error))}`);
+    report.nextSafeAction = 'The Codex log database was not changed. Check free space, then run doctor again.';
+    return { report, reportPath: await writeReport(report) };
+  }
   report.metrics.backupCreated = true;
   report.findings.backup = { path: redactPath(backup.path), manifest: redactPath(backup.manifestPath) };
 
@@ -84,12 +117,14 @@ export async function runFixSafe(options: {
   const beforeWalBytes = preflightResult.findings.targetState?.wal?.size ?? 0;
   const sqlite = await trustedCommandPath('sqlite3');
   const dbUri = createSqliteUri(mainPath, 'rw');
+  // From here on the database may have been touched, so failures are partial, never blocked.
   try {
     report.metrics.checkpointAttempted = true;
-    await runCheckpoint(sqlite, dbUri);
+    await runCheckpoint(sqlite, dbUri, scaledTimeoutMs(Number(beforeWalBytes), MIN_CHECKPOINT_TIMEOUT_MS));
   } catch (error) {
-    report.status = 'blocked';
+    report.status = 'partial';
     report.blockedReasons.push(error instanceof Error ? error.message : String(error));
+    report.nextSafeAction = 'The checkpoint did not complete; SQLite keeps logical data consistent. Run doctor again before retrying.';
     return { report, reportPath: await writeReport(report) };
   }
 
@@ -101,11 +136,11 @@ export async function runFixSafe(options: {
     })
   );
   if (report.blockedReasons.length > 0) {
-    report.status = 'blocked';
+    report.status = 'partial';
     return { report, reportPath: await writeReport(report) };
   }
   if (postMutation.blockers.length > 0) {
-    report.status = 'blocked';
+    report.status = 'partial';
     report.blockedReasons.push(...postMutation.blockers.map((reason) => `after mutation: ${reason}`));
     return { report, reportPath: await writeReport(report) };
   }
@@ -116,8 +151,18 @@ export async function runFixSafe(options: {
   }
   report.metrics.beforeWalBytes = beforeWalBytes;
   report.metrics.afterWalBytes = afterWalBytes;
+  // Kept for compatibility: WAL bytes folded into the database, not bytes freed.
   report.metrics.reclaimedBytes = Math.max(0, Number(beforeWalBytes) - Number(afterWalBytes));
   report.metrics.mainDbForcedShrink = false;
+  const beforeMainBytes = beforeMutation.findings.targetState?.main?.size;
+  const afterMainBytes = postMutation.targetState?.main?.size;
+  if (typeof beforeMainBytes === 'number' && typeof afterMainBytes === 'number') {
+    report.metrics.beforeMainBytes = beforeMainBytes;
+    report.metrics.afterMainBytes = afterMainBytes;
+    report.metrics.targetNetDeltaBytes = (afterMainBytes + Number(afterWalBytes)) - (beforeMainBytes + Number(beforeWalBytes));
+  }
+  const backupBytes = await stat(backup.path).then((info) => info.size).catch(() => undefined);
+  if (backupBytes !== undefined) report.metrics.backupBytes = backupBytes;
   const retention = await pruneBackups(path.join(appDataHome(), 'backups'), { keepPath: path.dirname(backup.path) }).catch((error) => ({
     deleted: 0,
     warnings: [error instanceof Error ? error.message : String(error)]
@@ -176,7 +221,28 @@ function redactPreflightFindings(findings: Awaited<ReturnType<typeof runPrefligh
   };
 }
 
-async function createBackup(mainPath: string) {
+function scaledTimeoutMs(bytes: number, minimumMs: number): number {
+  if (!Number.isFinite(bytes) || bytes <= 0) return minimumMs;
+  return Math.min(MAX_SQLITE_TIMEOUT_MS, Math.max(minimumMs, Math.ceil(bytes / ASSUMED_SQLITE_BYTES_PER_MS)));
+}
+
+async function availableBytesNear(target: string): Promise<number | undefined> {
+  let current = target;
+  while (true) {
+    try {
+      const volume = await statfs(current);
+      const available = Number(volume.bavail) * Number(volume.bsize);
+      return Number.isSafeInteger(available) && available >= 0 ? available : undefined;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return undefined;
+      const parent = path.dirname(current);
+      if (parent === current) return undefined;
+      current = parent;
+    }
+  }
+}
+
+async function createBackup(mainPath: string, timeoutMs: number) {
   const backupDir = path.join(appDataHome(), 'backups');
   await ensurePrivateDir(backupDir);
   const workDir = await mkdtemp(path.join(backupDir, 'backup-'));
@@ -187,8 +253,9 @@ async function createBackup(mainPath: string) {
   try {
     const sqlite = await trustedCommandPath('sqlite3');
     const vacuum = await runCommand(sqlite, ['-init', '/dev/null', createSqliteUri(mainPath, 'ro'), `VACUUM INTO '${tmpPath.replaceAll("'", "''")}';`], {
-      timeoutMs: 60_000
+      timeoutMs
     });
+    if (vacuum.timedOut) throw new Error('backup timed out');
     if (vacuum.code !== 0) throw new Error('backup failed');
     await chmod(tmpPath, 0o600);
     const inspection = await inspectSqliteSnapshot(tmpPath);
@@ -228,14 +295,15 @@ async function targetDirectoryBlockers(mainPath: string): Promise<string[]> {
   return blockers.map(redactPath);
 }
 
-async function runCheckpoint(sqlite: string, dbUri: string) {
+async function runCheckpoint(sqlite: string, dbUri: string, timeoutMs: number) {
   const checkpoint = await runCommand(sqlite, [
     '-json',
     '-init',
     '/dev/null',
     dbUri,
     'PRAGMA busy_timeout=0; PRAGMA wal_checkpoint(TRUNCATE);'
-  ]);
+  ], { timeoutMs });
+  if (checkpoint.timedOut) throw new Error('checkpoint timed out; outcome unknown');
   if (checkpoint.code !== 0 || checkpoint.stdoutTruncated || checkpoint.stderrTruncated) {
     throw new Error('checkpoint failed');
   }

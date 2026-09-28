@@ -1195,7 +1195,14 @@ function resultStatus(result: unknown): string {
 }
 
 function resultChanged(result: unknown): boolean {
-  return isObject(result) && result.changed === true;
+  if (!isObject(result)) return false;
+  if (result.changed === true) return true;
+  // fix reports and Cursor results carry no `changed` flag; derive it from what they actually did.
+  if ('report' in result && isObject(result.report) && isObject(result.report.metrics)
+    && result.report.metrics.checkpointAttempted === true) {
+    return true;
+  }
+  return typeof result.deletedEntries === 'number' && result.deletedEntries > 0;
 }
 
 function resultBlockedReasons(result: unknown): string[] {

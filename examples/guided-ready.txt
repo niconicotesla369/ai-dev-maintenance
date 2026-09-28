@@ -46,6 +46,6 @@ Re-checking and reclaiming Cursor caches and logs...
 │ Managed state: targets plus AIDM backups, reports, and plans.                │
 │ Volume free: whole volume; not attributed to AIDM.                           │
 │ Saved           <home>/.ai-dev-maintenance/reclaim-runs/<run>.json           │
-│ View            aidm report --latest --html                                  │
+│ View            aidm doctor --html                                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 

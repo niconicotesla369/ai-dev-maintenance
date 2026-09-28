@@ -1,6 +1,9 @@
 import { runCodexDoctor as defaultRunCodexDoctor, runDoctor as defaultRunDoctor } from './doctor.js';
 import { runFixSafe as defaultRunFixSafe } from './fix.js';
-import { runCursorSafeCleanup as defaultRunCursorSafeCleanup } from './cursor-clean.js';
+import {
+  cursorProcessBlocker as defaultCursorProcessBlocker,
+  runCursorSafeCleanup as defaultRunCursorSafeCleanup
+} from './cursor-clean.js';
 import { runPressureDoctor as defaultRunPressureDoctor } from './pressure/doctor.js';
 import { renderPressureReport } from './pressure/render.js';
 import { buildHistoryReport as defaultBuildHistoryReport, renderHistoryReport } from './history.js';
@@ -136,6 +139,7 @@ export type CliCommands = {
   createReclaimMeasurer: typeof defaultCreateReclaimMeasurer;
   writeReclaimRunRecord: typeof defaultWriteReclaimRunRecord;
   latestReclaimRun: typeof defaultLatestReclaimRunRecord;
+  cursorProcessBlocker: typeof defaultCursorProcessBlocker;
 };
 
 export type CliRuntimeOptions = {
@@ -224,6 +228,7 @@ async function routeCliCommand(argv: string[], runtime: CliRuntimeOptions): Prom
     createReclaimMeasurer: defaultCreateReclaimMeasurer,
     writeReclaimRunRecord: defaultWriteReclaimRunRecord,
     latestReclaimRun: defaultLatestReclaimRunRecord,
+    cursorProcessBlocker: defaultCursorProcessBlocker,
     ...runtime.commands
   };
   const io = normalizeCliIo(runtime.io);
@@ -276,6 +281,7 @@ async function routeCliCommand(argv: string[], runtime: CliRuntimeOptions): Prom
       commands: {
         runDoctor: async (options) => runGuidedDoctor(options),
         createPlan: async (action) => commands.createPlan({ action, env }),
+        cursorBlocker: async () => commands.cursorProcessBlocker({ env }),
         applyPlan: async (planId) => commands.applyPlan({ planId, env }),
         measurer: commands.createReclaimMeasurer(env),
         writeRunRecord: async (record) => commands.writeReclaimRunRecord(record, env)

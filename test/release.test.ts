@@ -375,7 +375,7 @@ describe('release readiness', () => {
     expect(readme).toContain('Emergency / Advanced Only');
     expect(readme).toContain('1. Diagnose only');
     expect(readme).toContain('3. Only if the output says it is safe');
-    expect(readme).toContain('npm install -g ai-dev-maintenance@0.6.0');
+    expect(readme).toContain('npm install -g ai-dev-maintenance@0.6.1');
     expect(readme).toContain('ai-dev-maintenance --version | -v | version');
     expect(readme).toContain('cursor clean --safe --yes');
     expect(readme).toContain('aidm');
@@ -1083,7 +1083,7 @@ describe('release readiness', () => {
         schemaPath: 'schemas/reclaim-scan-result.v1.schema.json',
         expected: {
           schemaVersion: 1,
-          toolVersion: '0.6.0',
+          toolVersion: '0.6.1',
           command: 'reclaim scan codex-session-images',
           status: 'ok',
           contentRead: true,
@@ -1112,7 +1112,7 @@ describe('release readiness', () => {
         schemaPath: 'schemas/native-compression-status.v1.schema.json',
         expected: {
           schemaVersion: 1,
-          toolVersion: '0.6.0',
+          toolVersion: '0.6.1',
           command: 'reclaim status codex-native-compression',
           status: 'ok',
           supported: true,
@@ -1133,7 +1133,7 @@ describe('release readiness', () => {
         schemaPath: 'schemas/codex-session-monitor-result.v1.schema.json',
         expected: {
           schemaVersion: 1,
-          toolVersion: '0.6.0',
+          toolVersion: '0.6.1',
           command: 'monitor codex-sessions',
           status: 'ok',
           currentBytes: 10 * 1024 ** 3,

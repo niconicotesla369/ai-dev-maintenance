@@ -28,9 +28,9 @@ The visual report can reveal and copy only fixed, allowlisted plan commands. It 
 `doctor remains metadata-only`: it never reads session bodies. `reclaim scan codex-session-images` is a separate explicit command and **reads session files** only to estimate embedded image payloads. Its defaults are `--older-than-days 30` and `--min-file-size-mb 50` (binary MiB); it creates no plan and rewrites nothing.
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim scan codex-session-images
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim status codex-native-compression
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- monitor codex-sessions
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- reclaim scan codex-session-images
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- reclaim status codex-native-compression
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- monitor codex-sessions
 aidm plan codex-session-image-prune --older-than-days 30 --min-file-size-mb 50
 aidm apply --plan <planId> --yes --accept-image-loss
 aidm plan codex-sparkle-clean
@@ -80,24 +80,24 @@ Human-facing TTY output now uses ANSI color, Unicode borders, meters, and compac
 Run the guided local check:
 
 ```bash
-npx --yes ai-dev-maintenance@0.6.0
+npx --yes ai-dev-maintenance@0.6.1
 ```
 
 In a normal terminal this starts the guided reclaim flow. It diagnoses first, lists each candidate (the Codex log-database write-ahead log and Cursor caches/logs) with an estimate, the reason it is reclaimable, and its impact, and asks you to approve each item separately. Approved items are re-checked immediately before they run, and the result shows measured before/after sizes. Chats and session history, settings, sign-in data, workspace state, source code, and Git data are never candidates; session-image pruning and Sparkle cleanup are never offered in this flow.
 
-The guided result separates four measurements: the pre-run estimate, the logical size change of the applied targets, the net change of all managed state (targets plus AIDM backups, reports, and plans), and the observed volume free-space change, which is never attributed to AIDM. Blocked and unknown results are not counted, and a value that cannot be measured is shown as not measurable rather than zero. The Codex write-ahead log has no estimate because checkpointing folds it into the database instead of deleting it; the measured net change is usually much smaller than the write-ahead log size, and the private backup adds to managed state. Each approved run writes one private record under `<home>/.ai-dev-maintenance/reclaim-runs/` (the newest 20 are kept), and `aidm report --latest --html` shows the latest one.
+The guided result separates four measurements: the pre-run estimate, the logical size change of the applied targets, the net change of all managed state (targets plus AIDM backups, reports, and plans), and the observed volume free-space change, which is never attributed to AIDM. Blocked and unknown results are not counted, and a value that cannot be measured is shown as not measurable rather than zero. The Codex write-ahead log has no estimate because checkpointing folds it into the database instead of deleting it; the measured net change is usually much smaller than the write-ahead log size, and the private backup adds to managed state. Each approved run writes one private record under `<home>/.ai-dev-maintenance/reclaim-runs/` (the newest 20 are kept). `aidm doctor --html` runs a fresh full diagnosis and shows the latest run; `aidm report --latest --html` shows it next to the latest saved full report. The guided readiness check does not replace that saved report.
 `doctor` is a read-only multi-tool report for Codex, Claude Code, and Cursor.
 
 Pinned safety-first diagnosis:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- doctor --show-paths
 ```
 
 Live CPU/RAM pressure check:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- pressure
 ```
 
 Use `pressure` when the machine feels slow right now. Use `doctor` when you want to inspect disk growth from local AI-tool state.
@@ -105,7 +105,7 @@ Use `pressure` when the machine feels slow right now. Use `doctor` when you want
 Short command after global install:
 
 ```bash
-npm install -g ai-dev-maintenance@0.6.0
+npm install -g ai-dev-maintenance@0.6.1
 aidm
 ```
 
@@ -116,19 +116,19 @@ Manual commands are still available:
 1. Diagnose only:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- doctor --show-paths
 ```
 
 2. Review the latest report:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- report --latest
 ```
 
 3. Only if the output says it is safe:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- fix --safe --yes
 ```
 
 Use the pinned version above when you want repeatable behavior. The npm `latest` tag is convenient after you trust the release channel.
@@ -136,8 +136,8 @@ Use the pinned version above when you want repeatable behavior. The npm `latest`
 Cursor cache/log cleanup is separate from Codex WAL cleanup:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- cursor clean --safe --yes
 ```
 
 The first command is a dry run. The second command is the mutating cleanup.

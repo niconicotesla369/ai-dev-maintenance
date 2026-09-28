@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "toolVersion": "0.6.0",
+  "toolVersion": "0.6.1",
   "command": "monitor codex-sessions",
   "status": "ok",
   "currentBytes": 10737418240,

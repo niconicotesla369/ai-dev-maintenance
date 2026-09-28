@@ -4,7 +4,7 @@ import { runCli } from '../src/cli.js';
 import { TOOL_VERSION } from '../src/version.js';
 import type { CliRuntimeOptions } from '../src/cli-router.js';
 
-const RELEASE_VERSION = '0.6.0';
+const RELEASE_VERSION = '0.6.1';
 
 function readmePackageCommandLines(readme: string): string[] {
   return readme
@@ -45,7 +45,7 @@ describe('root version CLI', () => {
   });
 });
 
-describe('v0.6.0 release metadata', () => {
+describe('v0.6.1 release metadata', () => {
   test('CLI and machine-readable metadata agree on the release version', async () => {
     const cliResult = await runCli(['--version'], runtimeThatMustNotRunCommands([]));
     const packageMetadata = JSON.parse(await readFile('package.json', 'utf8')) as { version?: unknown };

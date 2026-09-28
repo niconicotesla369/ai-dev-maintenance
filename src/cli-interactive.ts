@@ -1,6 +1,7 @@
 import { bannerText } from './cli-banner.js';
 import { formatBytes } from './cli-render.js';
 import type { NormalizedCliIo } from './cli-io.js';
+import { redactPath } from './paths.js';
 import type { ApplyPlanResult, MaintenancePlanSummary } from './plan.js';
 import {
   RECLAIM_ACTION_LABELS,
@@ -24,6 +25,7 @@ export type GuidedCommands = {
   runDoctor: (options?: { persistReport?: boolean }) => Promise<{ report: MaintenanceReport; reportPath?: string }>;
   createPlan: (action: ReclaimAction) => Promise<MaintenancePlanSummary>;
   applyPlan: (planId: string) => Promise<ApplyPlanResult>;
+  cursorBlocker: () => Promise<string | undefined>;
   measurer: ReclaimMeasurer;
   writeRunRecord: (record: ReclaimRunRecord) => Promise<string>;
 };
@@ -84,7 +86,8 @@ export async function runGuidedCli(options: GuidedOptions): Promise<GuidedResult
 
 async function offerCandidates(options: GuidedOptions, state: { waited: boolean }): Promise<GuidedResult> {
   await options.io.write('Checking what can be reclaimed safely...\n');
-  const diagnosis = await options.commands.runDoctor();
+  // The readiness check is Codex-only; persisting it would replace the latest full diagnosis report.
+  const diagnosis = await options.commands.runDoctor({ persistReport: false });
   const candidates = await discoverCandidates(options, diagnosis.report);
   await writeCandidates(options, candidates);
 
@@ -150,15 +153,17 @@ async function cursorCandidate(options: GuidedOptions): Promise<Candidate> {
   if (plan.status === 'ready' && estimate <= 0) {
     return { ...base, status: 'empty', lines: ['Nothing to remove: Cursor caches and logs are empty or absent.'], reasons: [] };
   }
+  // A running Cursor rewrites its caches, so offering the item would only end in a drifted plan.
+  const processBlocker = plan.status === 'ready' ? await options.commands.cursorBlocker() : undefined;
   return {
     ...base,
-    status: plan.status === 'ready' ? 'ready' : 'blocked',
+    status: plan.status === 'ready' && !processBlocker ? 'ready' : 'blocked',
     lines: [
       `Estimate      ${formatBytes(estimate)} in ${plan.preview.targetCount ?? 0} cache/log folders`,
       'Why           Cursor rebuilds its caches, VSIX cache, and logs',
       'Impact        Cursor must be closed; rebuilt on next launch'
     ],
-    reasons: plan.blockedReasons
+    reasons: processBlocker ? [...plan.blockedReasons, processBlocker] : plan.blockedReasons
   };
 }
 
@@ -188,7 +193,7 @@ async function runApproved(options: GuidedOptions, approved: Candidate[]): Promi
     try {
       const result = await options.commands.applyPlan(candidate.planId ?? '');
       outcome = result.status;
-      reasons = result.blockedReasons;
+      reasons = result.blockedReasons.map(friendlyReason);
     } catch (error) {
       outcome = 'unknown';
       reasons = [`apply outcome is unknown: ${error instanceof Error ? error.message : String(error)}`];
@@ -222,13 +227,13 @@ async function runApproved(options: GuidedOptions, approved: Candidate[]): Promi
   let savedPath: string | undefined;
   let saveWarning: string | undefined;
   try {
-    savedPath = await options.commands.writeRunRecord(record);
+    savedPath = redactPath(await options.commands.writeRunRecord(record));
   } catch (error) {
-    saveWarning = `Result record could not be saved: ${error instanceof Error ? error.message : String(error)}`;
+    saveWarning = `Result record could not be saved: ${redactPath(error instanceof Error ? error.message : String(error))}`;
   }
   const lines = renderReclaimRunRecord(record, savedPath);
   if (saveWarning) lines.push(`Warning         ${saveWarning}`);
-  if (savedPath) lines.push('View            aidm report --latest --html');
+  if (savedPath) lines.push('View            aidm doctor --html');
   await writeSection(options, 'WHAT CHANGED', lines, record.status === 'ok' ? 'success' : 'info');
   return finish(options, record.status === 'ok' && !saveWarning ? 0 : 3);
 }
@@ -309,6 +314,13 @@ class GuidedAbort extends Error {}
 
 function guidedWidth(options: GuidedOptions): number {
   return Math.max(80, Math.min(options.io.columns, 110));
+}
+
+function friendlyReason(reason: string): string {
+  if (reason === 'plan identity drifted') {
+    return 'targets changed after the check (is the app running?); nothing was changed. Close it and re-check.';
+  }
+  return reason;
 }
 
 function unique(values: string[]): string[] {

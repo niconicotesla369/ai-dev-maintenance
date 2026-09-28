@@ -79,6 +79,8 @@ function visualReportClient(config: VisualReportClientConfig): void {
   }
 
   function template(key: string, bytes: string | undefined): string {
+    // An unmeasured value gets its own sentence instead of "Unknown" spliced into a byte template.
+    if (bytes === undefined) return copy()[`${key}Unknown`] ?? copy().unknown ?? '';
     const source = copy()[key] ?? '';
     return source.replace('{bytes}', formatBytes(bytes));
   }
@@ -121,12 +123,10 @@ function visualReportClient(config: VisualReportClientConfig): void {
         `${copy().diskPressure ?? ''}: ${diskPressure?.textContent ?? copy().unknown ?? ''}; ${freeSpace?.textContent ?? copy().unknown ?? ''}`
       );
     }
-    const reportTime = element('report-time');
-    const timestamp = reportTime?.dataset.timestamp;
-    if (reportTime && timestamp) {
-      const parsed = new Date(timestamp);
+    for (const timeElement of document.querySelectorAll<HTMLElement>('[data-timestamp]')) {
+      const parsed = new Date(timeElement.dataset.timestamp ?? '');
       if (Number.isFinite(parsed.getTime())) {
-        reportTime.textContent = new Intl.DateTimeFormat(localeTags[locale], {
+        timeElement.textContent = new Intl.DateTimeFormat(localeTags[locale], {
           year: 'numeric',
           month: 'short',
           day: 'numeric',

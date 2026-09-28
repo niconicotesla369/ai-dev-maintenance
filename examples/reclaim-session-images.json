@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "toolVersion": "0.6.0",
+  "toolVersion": "0.6.1",
   "command": "reclaim scan codex-session-images",
   "status": "ok",
   "contentRead": true,

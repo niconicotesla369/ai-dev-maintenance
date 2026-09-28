@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "toolVersion": "0.6.0",
+  "toolVersion": "0.6.1",
   "generatedAt": "2026-06-25T00:00:00.000Z",
   "command": "doctor",
   "status": "ok",

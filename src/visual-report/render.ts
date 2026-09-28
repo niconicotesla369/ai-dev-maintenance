@@ -81,7 +81,7 @@ export function renderVisualReportHtml(
         <div>
           <p class="eyebrow" data-copy="storageHealth">${copy.storageHealth}</p>
           <h1 id="report-title" data-copy="${safeModel.volume.diskLevel === 'high' ? 'lowStorage' : 'storageHealth'}">${safeModel.volume.diskLevel === 'high' ? escapeHtml(copy.lowStorage) : copy.storageHealth}</h1>
-          <p id="found-opportunity" class="hero-summary"${byteData(opportunityBytes)}>${opportunityBytes === undefined ? copy.unknown : escapeHtml(fillBytes(copy.foundOpportunity, opportunityBytes))}</p>
+          <p id="found-opportunity" class="hero-summary"${byteData(opportunityBytes)}>${opportunityBytes === undefined ? escapeHtml(copy.foundOpportunityUnknown) : escapeHtml(fillBytes(copy.foundOpportunity, opportunityBytes))}</p>
           <p class="muted" data-copy="noChangesYet">${escapeHtml(copy.noChangesYet)}</p>
           <span class="status-chip"><span data-copy="${diskCopyKey(safeModel.volume.diskLevel)}">${escapeHtml(copy[diskCopyKey(safeModel.volume.diskLevel)])}</span></span>
         </div>
@@ -93,7 +93,7 @@ export function renderVisualReportHtml(
             <path class="gauge-track" pathLength="100" d="M 20 100 A 80 80 0 0 1 180 100"></path>
             <path class="gauge-level" pathLength="100" stroke-dasharray="${formatChartNumber(gaugePercent)} ${formatChartNumber(100 - gaugePercent)}" d="M 20 100 A 80 80 0 0 1 180 100"></path>
           </svg>
-          <div id="free-space" class="free-space-value"${byteData(safeModel.volume.availableBytes)}>${safeModel.volume.availableBytes === undefined ? copy.unknown : escapeHtml(fillBytes(copy.freeSpace, safeModel.volume.availableBytes))}</div>
+          <div id="free-space" class="free-space-value"${byteData(safeModel.volume.availableBytes)}>${safeModel.volume.availableBytes === undefined ? escapeHtml(copy.freeSpaceUnknown) : escapeHtml(fillBytes(copy.freeSpace, safeModel.volume.availableBytes))}</div>
           <p class="disk-pressure-line"><span data-copy="diskPressure">${escapeHtml(copy.diskPressure)}</span> · <strong id="disk-pressure-value" data-level="${safeModel.volume.diskLevel}">${escapeHtml(copy[diskCopyKey(safeModel.volume.diskLevel)])}</strong></p>
         </div>
       </section>

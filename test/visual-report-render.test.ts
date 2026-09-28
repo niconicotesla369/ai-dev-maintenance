@@ -214,6 +214,39 @@ describe('visual report renderer', () => {
     }
   });
 
+  test('uses dedicated sentences for unmeasured sizes instead of splicing Unknown into a byte template', () => {
+    const runtime = runClient({ unknownSizes: true, storedLocale: 'ja' });
+
+    expect(runtime.node('found-opportunity').textContent).toBe(VISUAL_REPORT_COPY.ja.foundOpportunityUnknown);
+    expect(runtime.node('free-space').textContent).toBe(VISUAL_REPORT_COPY.ja.freeSpaceUnknown);
+    expect(runtime.node('found-opportunity').textContent).not.toContain('不明の回収候補');
+
+    runtime.node('language-en').click();
+    expect(runtime.node('free-space').textContent).toBe(VISUAL_REPORT_COPY.en.freeSpaceUnknown);
+  });
+
+  test('renders unmeasured sizes with the dedicated English sentences before the client runs', () => {
+    const html = renderVisualReportHtml({
+      ...reportModel(),
+      coverage: 'unavailable',
+      volume: { diskLevel: 'unknown' },
+      totals: { trackedBytes: 0, safeBytes: 0, reviewBytes: 0, protectedBytes: 0 },
+      providers: [],
+      counts: { safe: 0, review: 0, protected: 0 },
+      availablePlans: []
+    }, renderOptions());
+
+    expect(html).toContain(VISUAL_REPORT_COPY.en.foundOpportunityUnknown);
+    expect(html).toContain(VISUAL_REPORT_COPY.en.freeSpaceUnknown);
+  });
+
+  test('localizes every timestamp, including the latest reclaim run', () => {
+    const runtime = runClient({ storedLocale: 'ja', reclaimTime: '2026-09-28T21:40:18.297Z' });
+
+    expect(runtime.node('reclaim-time').textContent).toMatch(/2026年/);
+    expect(runtime.node('report-time').textContent).toMatch(/2026年/);
+  });
+
   test('sends the exact same-origin close route on pagehide', () => {
     const runtime = runClient();
 
@@ -260,6 +293,8 @@ function renderOptions() {
 }
 
 type RuntimeOptions = {
+  unknownSizes?: boolean;
+  reclaimTime?: string;
   storedLocale?: string;
   fetchOk?: boolean;
   storageThrows?: boolean;
@@ -272,6 +307,8 @@ function runClient(options: RuntimeOptions = {}) {
 
   const document = new FakeDocument();
   document.mountReport();
+  if (options.unknownSizes) document.mountUnknownSizes();
+  if (options.reclaimTime) document.mountReclaimTime(options.reclaimTime);
   const intervals = new Map<number, () => void | Promise<void>>();
   const timeouts = new Map<number, () => void>();
   const clearedIntervals: number[] = [];
@@ -456,7 +493,17 @@ class FakeDocument {
     if (selector === '[data-copy]') return this.copyNodes;
     if (selector === '[data-bytes]') return this.byteNodes;
     if (selector === '[data-plan-copy]') return this.planButtons;
+    if (selector === '[data-timestamp]') return [...this.nodes.values()].filter((node) => node.dataset.timestamp !== undefined);
     return [];
+  }
+
+  mountUnknownSizes(): void {
+    delete this.getElementById('found-opportunity')!.dataset.bytes;
+    delete this.getElementById('free-space')!.dataset.bytes;
+  }
+
+  mountReclaimTime(timestamp: string): void {
+    this.node('time', 'reclaim-time').dataset.timestamp = timestamp;
   }
 
   createElement(tagName: string): FakeNode {

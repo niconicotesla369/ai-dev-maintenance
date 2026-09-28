@@ -128,6 +128,10 @@ export async function runCursorSafeCleanup(options: CursorCleanupOptions = {}): 
   };
 }
 
+export async function cursorProcessBlocker(options: CursorCleanupOptions = {}): Promise<string | undefined> {
+  return (await cursorProcessStatus(options)).blockedReason;
+}
+
 async function cursorProcessStatus(options: CursorCleanupOptions): Promise<{ blockedReason?: string }> {
   let processList = options.processList;
   if (processList === undefined) {

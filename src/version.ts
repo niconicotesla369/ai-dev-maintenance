@@ -1,3 +1,3 @@
-export const TOOL_VERSION = '0.6.0';
+export const TOOL_VERSION = '0.6.1';
 export const CODEX_REPORT_SCHEMA_VERSION = 1;
 export const REPORT_SCHEMA_VERSION = CODEX_REPORT_SCHEMA_VERSION;

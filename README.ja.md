@@ -28,9 +28,9 @@ Visual Reportでできるのは、固定allowlistに含まれるplanコマンド
 `doctor はmetadata-onlyのまま`であり、session本文を読みません。`reclaim scan codex-session-images` は別の明示的CLI commandで、見積もりのためだけに `session fileを読みます`。defaultは `--older-than-days 30` と `--min-file-size-mb 50`（binary MiB）で、plan作成・書き換えは行いません。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim scan codex-session-images
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- reclaim status codex-native-compression
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- monitor codex-sessions
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- reclaim scan codex-session-images
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- reclaim status codex-native-compression
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- monitor codex-sessions
 aidm plan codex-session-image-prune --older-than-days 30 --min-file-size-mb 50
 aidm apply --plan <planId> --yes --accept-image-loss
 aidm plan codex-sparkle-clean
@@ -106,24 +106,24 @@ memory pressure はmacOSの `memory_pressure -Q` を一次ソースにします�
 まずガイド付きで診断:
 
 ```bash
-npx --yes ai-dev-maintenance@0.6.0
+npx --yes ai-dev-maintenance@0.6.1
 ```
 
 通常のターミナルでは対話式の回収フローとして起動します。最初に診断し、回収候補（CodexログDBのwrite-ahead logと、Cursorのcache/log）ごとに見込み容量・回収できる理由・影響を表示して、項目ごとに承認を求めます。承認した項目は実行直前に再検証し、結果として実測のBefore/Afterを表示します。会話・session履歴、設定、認証情報、workspace state、ソースコード、Gitデータは候補になりません。session画像pruneとSparkle cleanupはこのフローでは提示しません。
 
-結果は4つの計測を区別して表示します。実行前の見込み、実行した対象の論理サイズの増減、管理対象全体（対象＋AIDMのバックアップ・レポート・プラン）の純増減、ボリューム空き容量の観測差分です。ボリュームの差分はAIDMの成果とは断定しません。停止・結果不明の項目は集計に含めず、測定できない値は0ではなく「測定不能」と表示します。Codexのwrite-ahead logはcheckpointで削除されずにDB本体へ統合されるため見込みを出しません。実測の純減はwrite-ahead logのサイズよりずっと小さいことが多く、private backupの分だけ管理対象は増えます。承認した実行ごとに `<home>/.ai-dev-maintenance/reclaim-runs/` へprivateな記録を1件書き込み（最新20件を保持）、`aidm report --latest --html` で最新の結果を表示できます。
+結果は4つの計測を区別して表示します。実行前の見込み、実行した対象の論理サイズの増減、管理対象全体（対象＋AIDMのバックアップ・レポート・プラン）の純増減、ボリューム空き容量の観測差分です。ボリュームの差分はAIDMの成果とは断定しません。停止・結果不明の項目は集計に含めず、測定できない値は0ではなく「測定不能」と表示します。Codexのwrite-ahead logはcheckpointで削除されずにDB本体へ統合されるため見込みを出しません。実測の純減はwrite-ahead logのサイズよりずっと小さいことが多く、private backupの分だけ管理対象は増えます。承認した実行ごとに `<home>/.ai-dev-maintenance/reclaim-runs/` へprivateな記録を1件書き込み（最新20件を保持）。`aidm doctor --html` は全体を新たに診断して最新の結果を表示し、`aidm report --latest --html` は保存済みの最新の全体レポートと並べて表示します。案内フローの事前チェックは、保存済みのレポートを置き換えません。
 `doctor` はCodex / Claude Code / Cursorの横断read-onlyレポートです。
 
 安全重視の固定版:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- doctor --show-paths
 ```
 
 今まさにPCが重い時のCPU/RAM確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- pressure
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- pressure
 ```
 
 動作が重い原因を今すぐ見たい時は `pressure`、AIツールのローカル状態やディスク肥大を調べたい時は `doctor` を使います。
@@ -131,7 +131,7 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- pressure
 短いコマンドで起動したい場合:
 
 ```bash
-npm install -g ai-dev-maintenance@0.6.0
+npm install -g ai-dev-maintenance@0.6.1
 aidm
 ```
 
@@ -142,19 +142,19 @@ CodexなどのAIコーディングツールを開いたままでも診断はで�
 1. 診断だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- doctor --show-paths
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- doctor --show-paths
 ```
 
 2. 最新レポートを確認:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- report --latest
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- report --latest
 ```
 
 3. 出力で安全と表示された場合だけ実行:
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- fix --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- fix --safe --yes
 ```
 
 `npm exec` はCLI起動前にnpm registryからpackageを取得する場合があります。CLI起動後、このツールはネットワーク通信を行いません。
@@ -162,8 +162,8 @@ npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- fix --safe --yes
 Cursorのcache/log cleanupはCodex WAL cleanupとは別コマンドです。
 
 ```bash
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe
-npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.0 -- cursor clean --safe --yes
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- cursor clean --safe
+npm exec --yes --ignore-scripts ai-dev-maintenance@0.6.1 -- cursor clean --safe --yes
 ```
 
 1つ目はdry-runです。2つ目だけが実際に削除します。

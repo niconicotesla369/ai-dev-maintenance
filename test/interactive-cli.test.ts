@@ -16,6 +16,7 @@ type Harness = {
   appDataBytes?: Array<number | null>;
   volumeBytes?: Array<number | null>;
   saveError?: Error;
+  cursorBlocker?: string;
 };
 
 function guided(harness: Harness = {}) {
@@ -51,6 +52,7 @@ function guided(harness: Harness = {}) {
       if (result instanceof Error) throw result;
       return result;
     },
+    cursorProcessBlocker: async () => harness.cursorBlocker,
     createReclaimMeasurer: () => measurer,
     writeReclaimRunRecord: async (record: ReclaimRunRecord) => {
       if (harness.saveError) throw harness.saveError;
@@ -121,7 +123,7 @@ describe('guided reclaim CLI', () => {
     expect(result.output).toContain('Target        605.5 KiB -> 68.4 KiB (-537.1 KiB)');
     expect(result.output).toContain('Volume free: whole volume; not attributed to AIDM.');
     expect(result.output).toContain(`Saved           ${SAVED_PATH}`);
-    expect(result.output).toContain('View            aidm report --latest --html');
+    expect(result.output).toContain('View            aidm doctor --html');
   });
 
   test('reports a WAL fold by its measured net change, not by the WAL size', async () => {
@@ -238,7 +240,42 @@ describe('guided reclaim CLI', () => {
 
     expect(result.exitCode).toBe(3);
     expect(result.output).toContain('Result record could not be saved: disk full');
-    expect(result.output).not.toContain('aidm report --latest --html');
+    expect(result.output).not.toContain('aidm doctor --html');
+  });
+
+  test('pauses Cursor before asking when Cursor is running', async () => {
+    const harness = guided({
+      doctorReports: [doctor({ wal: 0, openHandles: false })],
+      plans: { 'cursor-clean': { preview: { targetCount: 4, reclaimableBytes: 671_000_000 } } },
+      cursorBlocker: 'Cursor is running'
+    });
+
+    const result = await runCli(['--plain'], { env: ENV, io: memoryIo('2\n', true, 100), commands: harness.commands });
+
+    expect(result.output).toContain('[2] Cursor caches and logs  paused for safety');
+    expect(result.output).toContain('Reason        Cursor is running');
+    expect(result.output).not.toContain('Reclaim Cursor caches and logs?');
+    expect(harness.calls.applied).toEqual([]);
+  });
+
+  test('explains a drifted plan in plain words and redacts the saved path', async () => {
+    const harness = guided({
+      doctorReports: [doctor({ wal: 0, openHandles: false })],
+      plans: { 'cursor-clean': { preview: { targetCount: 1, reclaimableBytes: 5_000 } } },
+      apply: { 'cursor-clean': applyResult('cursor-clean', 'blocked', ['plan identity drifted']) },
+      targetBytes: { 'cursor-clean': [5_000, 5_000] }
+    });
+    const commands = {
+      ...(harness.commands as Record<string, unknown>),
+      writeReclaimRunRecord: async () => '/Users/example/.ai-dev-maintenance/reclaim-runs/reclaim-run-x.json'
+    };
+
+    const result = await runCli(['--plain'], { env: ENV, io: memoryIo('y\n', true, 100), commands: commands as never });
+
+    expect(result.output).toContain('targets changed after the check (is the app running?); nothing was changed. Close it and re-check.');
+    expect(result.output).not.toContain('plan identity drifted');
+    expect(result.output).not.toContain('/Users/example');
+    expect(result.output).toContain('Saved           <home>/.ai-dev-maintenance/reclaim-runs/reclaim-run-x.json');
   });
 
   test('wait mode polls until the database is released, then asks for approval', async () => {
@@ -259,8 +296,7 @@ describe('guided reclaim CLI', () => {
     expect(result.exitCode).toBe(0);
     expect(result.output).toContain('Waiting for Codex to release its log database. AIDM will not force close Codex.');
     expect(result.output).toContain('Database released.');
-    expect(harness.calls.doctor[0]).not.toBe(false);
-    expect(harness.calls.doctor).toContain(false);
+    expect(harness.calls.doctor.every((persist) => persist === false)).toBe(true);
     expect(harness.calls.applied).toEqual(['codex-fix']);
   });
 

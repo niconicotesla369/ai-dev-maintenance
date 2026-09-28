@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.6.1 - 2026-09-29
+
+- Guided reclaim checks whether Cursor is running before listing it; a running Cursor is shown as paused for safety instead of being offered and then stopping on a drifted plan.
+- A plan that stops because its targets changed after the check is explained in plain words instead of `plan identity drifted`.
+- The guided readiness check no longer writes a Codex-only report, so `report --latest --html` keeps showing the latest full diagnosis; the result now points to `aidm doctor --html`.
+- The saved reclaim-run path is shown as `<home>/...` like other human output.
+- The visual report uses dedicated sentences when reclaimable size or free space is unknown, and localizes every timestamp, including the latest reclaim run.
+
 ## 0.6.0 - 2026-09-29
 
 - Add the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.

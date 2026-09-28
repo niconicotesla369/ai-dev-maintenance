@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.6.0 - 2026-08-26
+## 0.6.0 - 2026-09-29
 
 - Add the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.
 - Add explicit, content-reading Codex session-image estimates and CLI-only, irreversible image-prune plans requiring `--yes --accept-image-loss`; pruning is never unattended and writes private audit manifests (hashes and counts only; removed images cannot be restored from them).

@@ -474,7 +474,7 @@ describe('release readiness', () => {
   test('v0.6.0 release notes retain the visual-report boundary', async () => {
     const changelog = await readFile('CHANGELOG.md', 'utf8');
     const releaseNotes = changelog
-      .split('## 0.6.0 - 2026-08-26', 2)[1]
+      .split('## 0.6.0 - 2026-09-29', 2)[1]
       ?.split('\n## ', 1)[0] ?? '';
 
     for (const expected of [

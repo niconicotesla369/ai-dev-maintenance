@@ -2,10 +2,9 @@
 
 ## Unreleased
 
-- Document the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.
-
 ## 0.6.0 - 2026-08-26
 
+- Add the local-only, ephemeral visual report for `aidm doctor --html` and `aidm report --latest --html`: memory-only HTML, normal redacted JSON retention, session-only language preference, browser-history limits, incompatible flags, and CLI-only/MCP-excluded read-only boundaries.
 - Add explicit, content-reading Codex session-image estimates and CLI-only, irreversible image-prune plans requiring `--yes --accept-image-loss`; pruning is never unattended and writes private manifests for recovery evidence.
 - Add advisory native-compression status without reading or changing Codex configuration, and conditional cleanup for only the exact Codex Sparkle `Installation/*` cache.
 - Add an opt-in metadata-only Codex session monitor with private local state, explicit LaunchAgent install/remove plans, best-effort notifications, and path-move reinstall guidance.

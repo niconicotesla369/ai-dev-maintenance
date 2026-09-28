@@ -471,9 +471,11 @@ describe('release readiness', () => {
     }
   });
 
-  test('Unreleased release notes retain the visual-report boundary', async () => {
+  test('v0.6.0 release notes retain the visual-report boundary', async () => {
     const changelog = await readFile('CHANGELOG.md', 'utf8');
-    const unreleased = changelog.split('## Unreleased', 2)[1]?.split('\n## ', 1)[0] ?? '';
+    const releaseNotes = changelog
+      .split('## 0.6.0 - 2026-08-26', 2)[1]
+      ?.split('\n## ', 1)[0] ?? '';
 
     for (const expected of [
       'aidm doctor --html',
@@ -482,7 +484,7 @@ describe('release readiness', () => {
       'memory-only',
       'CLI-only'
     ]) {
-      expect(unreleased).toContain(expected);
+      expect(releaseNotes).toContain(expected);
     }
   });
 

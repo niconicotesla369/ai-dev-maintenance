@@ -49,6 +49,32 @@ native statusはadvisoryであり、`Codex native-compressionの設定を変更�
 
 monitorは `opt-in` です。手動 `aidm monitor codex-sessions` はmetadata-onlyでpersistしません。明示的plan/apply installはLaunchAgent plistを書き込みbootstrapします。plistは `<home>/Library/LaunchAgents/com.niconicotesla369.ai-dev-maintenance.codex-session-monitor.plist` です。scheduled runがmonitor stateとlatest reportをpersistします。保存先は `<home>/.ai-dev-maintenance/monitor/` の `codex-sessions-state.v1.json` と `codex-sessions-latest.v1.json` で、ローカルstateを書き込みます。default scheduleは毎月1日04:30 local time（`LowPriorityIO=true`、`Nice=10`）、alert defaultは総session state 8 GiBまたは5 GiB growthです。notification deliveryはbest-effortで、failureはwarningでありcleanupを起動しません。validated Node/AIDM pathを移動したらmonitorをreinstallしてください。`MCPはこれらの新しいactionを呼び出せません`。
 
+### 最初の15分：安全な確認順
+
+まずは変更を伴わない範囲から確認します。
+
+```bash
+aidm --version
+aidm doctor --html
+aidm reclaim status codex-native-compression
+aidm monitor codex-sessions
+```
+
+`doctor --html` はmetadata-onlyの診断を行い、通常の伏せ字済みJSONレポートを保存してから一時表示を開きます。すでに保存済みの診断だけを再表示する場合は `aidm report --latest --html` を使います。どちらのVisual Reportもcleanupを実行しません。
+
+| 目的 | コマンド | session本文 | ローカル書き込み・変更 |
+| --- | --- | --- | --- |
+| AIツール全体の診断とVisual Report | `aidm doctor --html` | 読まない | 伏せ字済みJSON reportのみ保存。HTML fileは保存しない |
+| 最新診断の再表示 | `aidm report --latest --html` | 読まない | 新規reportなし。HTML fileも保存しない |
+| Codex画像容量の見積もり | `aidm reclaim scan codex-session-images` | 明示的に読む | plan作成・書き換え・削除なし |
+| native compression状態確認 | `aidm reclaim status codex-native-compression` | 読まない | 設定変更・再圧縮なし |
+| session総量・増加量の手動確認 | `aidm monitor codex-sessions` | 読まない | stateをpersistしない |
+| 正確なCodex Sparkle cacheの回収 | `aidm plan codex-sparkle-clean` → `aidm apply --plan <planId> --yes` | 読まない | 安全確認済みの`Installation/*`だけを削除 |
+| 埋め込み画像の不可逆prune | `aidm plan codex-session-image-prune ...` → `aidm apply --plan <planId> --yes --accept-image-loss` | 読む | 対象sessionを再検証後に書き換え、private manifestを保存 |
+| 月次monitorの導入・解除 | `aidm plan codex-session-monitor-install` / `remove` → `aidm apply --plan <planId> --yes` | 読まない | LaunchAgentとprivate monitor stateを追加・削除 |
+
+迷った場合は、Visual Reportの`SAFE RECLAIM PLAN`に表示された固定コマンドをコピーし、まず`plan`の内容だけを確認してください。`plan`はcleanupを実行しません。`apply`は対象identityを再検証するため、古いplanや対象が変化したplanはblockedになります。画像pruneだけは不可逆なので、表示される見積もり・対象件数・manifest保存先を確認してから両方のconfirmationを付けてください。
+
 ## 追跡対象の状態と互換性
 
 `Tracked state`（追跡対象の状態）は、AIDMが明示的に診断した項目の合計であり、macOSの「System Data」全体ではありません。Codexでは、既知の重複しないバケットとprivateな `other-state` により、`CODEX_HOME` 配下のすべての通常ファイルを重複計上せずに対象にします。sessions、archives、generated images、backups、log database sidecars、unknown root stateは診断しますが、cleanup対象ではありません。
